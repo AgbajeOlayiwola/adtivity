@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
+        body: ['Space Grotesk', 'sans-serif'],
+        headline: ['Space Grotesk', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
@@ -88,11 +88,26 @@ export default {
             height: '0',
           },
         },
+        'gradient-bg': {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' },
+        },
+        'subtle-glow': {
+          '0%, 100%': { boxShadow: '0 0 5px hsl(var(--accent)), 0 0 10px hsl(var(--accent) / 0.7), 0 0 15px hsl(var(--accent) / 0.5)' },
+          '50%': { boxShadow: '0 0 10px hsl(var(--accent)), 0 0 20px hsl(var(--accent) / 0.7), 0 0 30px hsl(var(--accent) / 0.5)' },
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'gradient-bg': 'gradient-bg 15s ease infinite',
+        'subtle-glow': 'subtle-glow 5s ease-in-out infinite alternate',
       },
+      backgroundImage: {
+        'futuristic-gradient': 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)',
+        'dark-grid': "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='hsl(var(--border)/0.1)'%3E%3Cpath d='M0 .5H31.5V32'/%3E%3C/svg%3E\")",
+      }
     },
   },
   plugins: [require('tailwindcss-animate')],
