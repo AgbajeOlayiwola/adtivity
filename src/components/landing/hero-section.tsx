@@ -17,7 +17,7 @@ const HeroSection = () => {
               Measure Your Impact in <span className="bg-clip-text text-transparent bg-futuristic-gradient">Web3</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl mx-auto md:mx-0">
-              Adtivity is a measurement and attribution platform for Web 3, providing clear insights for your decentralized applications and projects.
+              Adtivity is a measurement and attribution platform for Web 3, providing clear insights for your decentralized applications, including Solana and EVM-compatible chains. Track user activity and key on-chain data.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <Link href="/dashboard">
@@ -37,11 +37,11 @@ const HeroSection = () => {
             <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 blur-2xl opacity-50 animate-subtle-glow"></div>
             <Image
               src="https://placehold.co/600x400.png"
-              alt="Futuristic Web3 analytics dashboard"
+              alt="Futuristic Web3 analytics dashboard for Solana and EVM"
               width={600}
               height={400}
               className="rounded-xl shadow-2xl relative z-10 transform transition-all duration-500 hover:scale-105"
-              data-ai-hint="web3 blockchain"
+              data-ai-hint="web3 blockchain solana"
             />
           </div>
         </div>

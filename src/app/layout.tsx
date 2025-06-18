@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Adtivity - Web3 Measurement & Attribution',
-  description: 'Adtivity is a measurement and attribution platform for Web 3, empowering your decentralized applications with clear insights.',
+  title: 'Adtivity - Web3 Measurement & Attribution for Solana & EVM',
+  description: 'Adtivity is a measurement and attribution platform for Web 3, empowering your decentralized applications (including Solana and EVM chains) with clear insights.',
 };
 
 export default function RootLayout({

@@ -31,7 +31,7 @@ const PricingSection = () => {
               <span className="text-muted-foreground">/month</span>
             </div>
             <ul className="mt-6 space-y-3 text-sm text-muted-foreground flex-grow">
-              <li>Basic Web3 KPI Dashboard</li>
+              <li>Basic Web3 KPI Dashboard (EVM)</li>
               <li>Limited Smart Contract Event Tracking</li>
               <li>Standard Reports</li>
             </ul>
@@ -44,14 +44,15 @@ const PricingSection = () => {
                 Most Popular
             </div>
             <h3 className="text-2xl font-semibold font-headline text-accent">Professional</h3>
-            <p className="mt-2 text-muted-foreground">For growing Web3 companies and dApps.</p>
+            <p className="mt-2 text-muted-foreground">For growing Web3 companies and dApps on EVM & Solana.</p>
             <div className="mt-6">
               <span className="text-5xl font-bold">$99</span>
               <span className="text-muted-foreground">/month</span>
             </div>
             <ul className="mt-6 space-y-3 text-sm text-muted-foreground flex-grow">
-              <li>Advanced Web3 KPI Dashboard</li>
+              <li>Advanced Web3 KPI Dashboard (EVM & Solana)</li>
               <li>Full Smart Contract Analytics</li>
+              <li>Solana dApp Integration</li>
               <li>On-chain/Off-chain Attribution</li>
               <li>Custom Reports & Export</li>
               <li>Priority Support</li>
@@ -62,14 +63,14 @@ const PricingSection = () => {
           {/* Enterprise Plan */}
           <div className="border border-border/50 rounded-xl p-8 flex flex-col bg-card/30 backdrop-blur-sm shadow-lg hover:shadow-accent/20 transition-shadow duration-300">
             <h3 className="text-2xl font-semibold font-headline text-accent">Enterprise</h3>
-            <p className="mt-2 text-muted-foreground">For large-scale Web3 platforms & protocols.</p>
+            <p className="mt-2 text-muted-foreground">For large-scale Web3 platforms & protocols across multiple chains.</p>
             <div className="mt-6">
               <span className="text-4xl font-bold">Custom</span>
             </div>
             <ul className="mt-6 space-y-3 text-sm text-muted-foreground flex-grow">
               <li>All Professional Features</li>
               <li>Dedicated Account Manager</li>
-              <li>Custom Blockchain Integrations</li>
+              <li>Custom Blockchain Integrations (Solana, EVM, etc.)</li>
               <li>SLA & Advanced Security</li>
             </ul>
             <Button variant="outline" className="mt-8 w-full border-accent text-accent hover:bg-accent/10">Contact Sales</Button>
@@ -85,10 +86,10 @@ const CTASection = () => {
     <section className="py-20 md:py-28 bg-gradient-to-br from-primary/20 via-background to-accent/20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter mb-6">
-          Ready to Master Your Web3 Analytics?
+          Ready to Master Your Web3 Analytics on Solana & Beyond?
         </h2>
         <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-10">
-          Join innovative Web3 projects leveraging Adtivity for clear measurement and attribution insights.
+          Join innovative Web3 projects leveraging Adtivity for clear measurement and attribution insights across multiple blockchains.
         </p>
         <Link href="/login">
           <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-10 py-4 text-xl shadow-xl shadow-primary/40 transition-all duration-300 hover:shadow-primary/60 transform hover:scale-105">
