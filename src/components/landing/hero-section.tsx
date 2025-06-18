@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Zap } from 'lucide-react';
@@ -38,20 +39,16 @@ const HeroSection = () => {
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 600 400"
               className="rounded-xl shadow-2xl relative z-10 transform transition-all duration-500 hover:scale-105 w-full h-auto"
-              aria-labelledby="heroSvgTitle"
+              aria-labelledby="heroSvgTitlePlanet"
             >
-              <title id="heroSvgTitle">Abstract representation of interconnected planets and data paths in a network</title>
+              <title id="heroSvgTitlePlanet">Abstract representation of a planet with continents made of glowing dots.</title>
               <defs>
-                <radialGradient id="gradPlanet1Hero" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                <radialGradient id="gradPlanetMain" cx="30%" cy="30%" r="70%" fx="40%" fy="40%">
                   <stop offset="0%" style={{stopColor: 'hsl(var(--primary))', stopOpacity: 1}} />
-                  <stop offset="100%" style={{stopColor: 'hsl(var(--primary) / 0.6)', stopOpacity: 1}} />
+                  <stop offset="100%" style={{stopColor: 'hsl(var(--primary) / 0.3)', stopOpacity: 1}} />
                 </radialGradient>
-                <radialGradient id="gradPlanet2Hero" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                  <stop offset="0%" style={{stopColor: 'hsl(var(--accent))', stopOpacity: 1}} />
-                  <stop offset="100%" style={{stopColor: 'hsl(var(--accent) / 0.6)', stopOpacity: 1}} />
-                </radialGradient>
-                 <filter id="svgPathGlow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                 <filter id="svgDotGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
                   <feMerge>
                     <feMergeNode in="coloredBlur"/>
                     <feMergeNode in="SourceGraphic"/>
@@ -59,57 +56,41 @@ const HeroSection = () => {
                 </filter>
               </defs>
 
-              {/* Planets */}
-              <circle cx="100" cy="120" r="40" fill="url(#gradPlanet1Hero)" />
-              <circle cx="480" cy="100" r="60" fill="url(#gradPlanet2Hero)" />
-              <circle cx="250" cy="300" r="30" fill="url(#gradPlanet1Hero)" />
-              <circle cx="500" cy="320" r="20" fill="url(#gradPlanet2Hero)" />
-              <circle cx="350" cy="180" r="25" fill="hsl(var(--muted))" opacity="0.5" />
+              {/* Main Planet Body */}
+              <circle cx="300" cy="200" r="150" fill="url(#gradPlanetMain)" opacity="0.8" />
+              <circle cx="300" cy="200" r="150" fill="transparent" stroke="hsl(var(--primary) / 0.5)" strokeWidth="2" />
 
+              {/* Continent Dots - Group 1 (e.g., Americas-like) */}
+              <g className="animate-pulsate-dot" style={{animationDelay: '0s'}}>
+                <circle cx="220" cy="150" r="8" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="235" cy="175" r="10" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="225" cy="200" r="7" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="240" cy="220" r="9" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="210" cy="180" r="6" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+              </g>
 
-              {/* Flight Paths */}
-              <path
-                d="M100,120 Q250,50 480,100"
-                stroke="hsl(var(--accent))"
-                fill="none"
-                className="animate-pulsate-path"
-                style={{ animationDelay: '0s' }}
-              />
-              <path
-                d="M100,120 Q150,250 250,300"
-                stroke="hsl(var(--primary))"
-                fill="none"
-                className="animate-pulsate-path"
-                style={{ animationDelay: '0.4s' }}
-              />
-              <path
-                d="M250,300 Q380,250 480,100"
-                stroke="hsl(var(--accent))"
-                fill="none"
-                className="animate-pulsate-path"
-                style={{ animationDelay: '0.8s' }}
-              />
-               <path
-                d="M480,100 C550,200 550,280 500,320"
-                stroke="hsl(var(--primary))"
-                fill="none"
-                className="animate-pulsate-path"
-                style={{ animationDelay: '1.2s' }}
-              />
-              <path
-                d="M100,120 C200,180 300,170 350,180"
-                stroke="hsl(var(--accent))"
-                fill="none"
-                className="animate-pulsate-path"
-                style={{ animationDelay: '1.6s' }}
-              />
-               <path
-                d="M350,180 C400,190 450,250 500,320"
-                stroke="hsl(var(--primary))"
-                fill="none"
-                className="animate-pulsate-path"
-                style={{ animationDelay: '2s' }}
-              />
+              {/* Continent Dots - Group 2 (e.g., Afro-Eurasia-like) */}
+              <g className="animate-pulsate-dot" style={{animationDelay: '0.3s'}}>
+                <circle cx="300" cy="160" r="10" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="330" cy="150" r="8" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="350" cy="180" r="12" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="340" cy="210" r="9" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="310" cy="200" r="10" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="360" cy="230" r="7" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="280" cy="230" r="8" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+              </g>
+
+              {/* Continent Dots - Group 3 (e.g., Australia-like) */}
+              <g className="animate-pulsate-dot" style={{animationDelay: '0.6s'}}>
+                <circle cx="380" cy="280" r="10" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="395" cy="270" r="7" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+              </g>
+              
+              {/* Smaller island/dots */}
+              <g className="animate-pulsate-dot" style={{animationDelay: '0.9s'}}>
+                <circle cx="180" cy="250" r="5" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+                <circle cx="420" cy="130" r="6" fill="hsl(var(--accent))" filter="url(#svgDotGlow)" />
+              </g>
             </svg>
           </div>
         </div>

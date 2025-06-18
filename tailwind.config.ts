@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -97,9 +98,13 @@ export default {
           '0%, 100%': { boxShadow: '0 0 5px hsl(var(--accent)), 0 0 10px hsl(var(--accent) / 0.7), 0 0 15px hsl(var(--accent) / 0.5)' },
           '50%': { boxShadow: '0 0 10px hsl(var(--accent)), 0 0 20px hsl(var(--accent) / 0.7), 0 0 30px hsl(var(--accent) / 0.5)' },
         },
-        'pulsate-path': {
+        'pulsate-path': { // Kept this in case it's used elsewhere, though not by the new planet SVG directly
           '0%, 100%': { strokeOpacity: '0.4', strokeWidth: '1.5px' },
           '50%': { strokeOpacity: '1', strokeWidth: '3px' },
+        },
+        'pulsate-dot': {
+          '0%, 100%': { opacity: '0.6', transform: 'scale(0.95)' },
+          '50%': { opacity: '1', transform: 'scale(1.05)' },
         },
       },
       animation: {
@@ -108,6 +113,7 @@ export default {
         'gradient-bg': 'gradient-bg 15s ease infinite',
         'subtle-glow': 'subtle-glow 5s ease-in-out infinite alternate',
         'pulsate-path': 'pulsate-path 2.5s ease-in-out infinite',
+        'pulsate-dot': 'pulsate-dot 2.5s ease-in-out infinite',
       },
       backgroundImage: {
         'futuristic-gradient': 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)',
