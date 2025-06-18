@@ -11,7 +11,7 @@ const Footer = () => {
           <div>
             <Logo size="text-2xl" />
             <p className="mt-4 text-sm text-muted-foreground">
-              Unlock the future of your data with Adtivity.
+              Adtivity: Measurement and attribution for Web 3.
             </p>
             <div className="mt-6 flex space-x-4">
               <Link href="#" className="text-muted-foreground hover:text-accent transition-colors">
@@ -32,10 +32,10 @@ const Footer = () => {
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">Solutions</h3>
               <ul role="list" className="mt-4 space-y-2">
-                <li><Link href="/#features" className="text-sm text-muted-foreground hover:text-accent transition-colors">KPI Dashboard</Link></li>
-                <li><Link href="/#features" className="text-sm text-muted-foreground hover:text-accent transition-colors">Anomaly Alerts</Link></li>
-                <li><Link href="/#features" className="text-sm text-muted-foreground hover:text-accent transition-colors">Predictive Forecasting</Link></li>
-                <li><Link href="/#features" className="text-sm text-muted-foreground hover:text-accent transition-colors">Custom Reports</Link></li>
+                <li><Link href="/#features" className="text-sm text-muted-foreground hover:text-accent transition-colors">Web3 KPI Dashboard</Link></li>
+                <li><Link href="/#features" className="text-sm text-muted-foreground hover:text-accent transition-colors">Smart Contract Analytics</Link></li>
+                <li><Link href="/#features" className="text-sm text-muted-foreground hover:text-accent transition-colors">NFT Project Tracking</Link></li>
+                <li><Link href="/#features" className="text-sm text-muted-foreground hover:text-accent transition-colors">DeFi Protocol Insights</Link></li>
               </ul>
             </div>
             <div>

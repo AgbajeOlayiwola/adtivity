@@ -11,18 +11,18 @@ const HeroSection = () => {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="text-center md:text-left">
             <span className="inline-flex items-center px-4 py-1 mb-4 text-sm font-medium text-primary bg-primary/10 rounded-full">
-              <Zap className="w-4 h-4 mr-2" /> Next-Gen Analytics
+              <Zap className="w-4 h-4 mr-2" /> Web3 Analytics Reimagined
             </span>
             <h1 className="font-headline text-5xl md:text-6xl lg:text-7xl font-bold tracking-tighter mb-6">
-              Future-Proof Your <span className="bg-clip-text text-transparent bg-futuristic-gradient">Decisions</span>
+              Measure Your Impact in <span className="bg-clip-text text-transparent bg-futuristic-gradient">Web3</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl mx-auto md:mx-0">
-              Adtivity empowers your business with cutting-edge AI analytics, transforming raw data into actionable insights and predictive foresight.
+              Adtivity is a measurement and attribution platform for Web 3, providing clear insights for your decentralized applications and projects.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <Link href="/dashboard">
                 <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8 py-3 text-lg shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105">
-                  Get Started Free
+                  Explore Dashboard
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
@@ -37,11 +37,11 @@ const HeroSection = () => {
             <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 blur-2xl opacity-50 animate-subtle-glow"></div>
             <Image
               src="https://placehold.co/600x400.png"
-              alt="Futuristic analytics dashboard"
+              alt="Futuristic Web3 analytics dashboard"
               width={600}
               height={400}
               className="rounded-xl shadow-2xl relative z-10 transform transition-all duration-500 hover:scale-105"
-              data-ai-hint="abstract data"
+              data-ai-hint="web3 blockchain"
             />
           </div>
         </div>

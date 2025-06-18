@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Adtivity - Futuristic Analytics',
-  description: 'Unlock the future of your data with Adtivity.',
+  title: 'Adtivity - Web3 Measurement & Attribution',
+  description: 'Adtivity is a measurement and attribution platform for Web 3, empowering your decentralized applications with clear insights.',
 };
 
 export default function RootLayout({
