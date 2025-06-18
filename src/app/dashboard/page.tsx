@@ -1,6 +1,6 @@
 'use client';
 import KpiCard from '@/components/dashboard/kpi-card';
-import { Users, DollarSign, Activity, BarChart, ShoppingCart, TrendingUp, Eye, Target } from 'lucide-react';
+import { Users, DollarSign, Activity, Target, TrendingUp, Eye, Lock, Wallet, Repeat, FilePlus2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, LineChart, Line, Tooltip as RechartsTooltip } from 'recharts';
@@ -11,6 +11,13 @@ const kpiData = [
   { title: 'Revenue', value: '$125,670', trend: 'up', trendValue: '+8.2%', icon: DollarSign, iconColorClass: 'text-green-500' },
   { title: 'Active Sessions', value: '1,589', trend: 'down', trendValue: '-2.1%', icon: Activity, iconColorClass: 'text-yellow-500' },
   { title: 'Conversion Rate', value: '4.75%', trend: 'up', trendValue: '+0.5%', icon: Target, iconColorClass: 'text-purple-500' },
+];
+
+const web3KpiData = [
+  { title: 'Total Value Locked (TVL)', value: '$2.5M', trend: 'up', trendValue: '+5.8%', icon: Lock, iconColorClass: 'text-primary', description: 'Total value of assets locked in your protocol.' },
+  { title: 'Active Wallets (Daily)', value: '1,200', trend: 'up', trendValue: '+3.2%', icon: Wallet, iconColorClass: 'text-accent', description: 'Unique wallets interacting with your dApp daily.' },
+  { title: 'Transaction Volume (24h)', value: '3,450 ETH', trend: 'down', trendValue: '-1.5%', icon: Repeat, iconColorClass: 'text-primary', description: 'Total volume of transactions in the last 24 hours.' },
+  { title: 'New Contracts Deployed', value: '25', trend: 'up', trendValue: '+10', icon: FilePlus2, iconColorClass: 'text-accent', description: 'Smart contracts deployed to your platform this week.' },
 ];
 
 const salesDataDefault = [
@@ -60,15 +67,25 @@ export default function KpiDashboardPage() {
 
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-headline font-semibold tracking-tight">KPI Dashboard</h1>
-      
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {kpiData.map((kpi) => (
-          <KpiCard key={kpi.title} {...kpi} />
-        ))}
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-headline font-semibold tracking-tight">Business Overview</h1>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
+          {kpiData.map((kpi) => (
+            <KpiCard key={kpi.title} {...kpi} />
+          ))}
+        </div>
       </div>
 
+      <div>
+        <h2 className="text-2xl font-headline font-semibold tracking-tight">Key Web3 Metrics</h2>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
+          {web3KpiData.map((kpi) => (
+            <KpiCard key={kpi.title} {...kpi} />
+          ))}
+        </div>
+      </div>
+      
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader>
