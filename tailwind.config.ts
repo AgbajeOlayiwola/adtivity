@@ -96,13 +96,18 @@ export default {
         'subtle-glow': {
           '0%, 100%': { boxShadow: '0 0 5px hsl(var(--accent)), 0 0 10px hsl(var(--accent) / 0.7), 0 0 15px hsl(var(--accent) / 0.5)' },
           '50%': { boxShadow: '0 0 10px hsl(var(--accent)), 0 0 20px hsl(var(--accent) / 0.7), 0 0 30px hsl(var(--accent) / 0.5)' },
-        }
+        },
+        'pulsate-path': {
+          '0%, 100%': { strokeOpacity: '0.4', strokeWidth: '1.5px' },
+          '50%': { strokeOpacity: '1', strokeWidth: '3px' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'gradient-bg': 'gradient-bg 15s ease infinite',
         'subtle-glow': 'subtle-glow 5s ease-in-out infinite alternate',
+        'pulsate-path': 'pulsate-path 2.5s ease-in-out infinite',
       },
       backgroundImage: {
         'futuristic-gradient': 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)',

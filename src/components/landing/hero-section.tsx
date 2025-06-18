@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Zap } from 'lucide-react';
-import Image from 'next/image';
 
 const HeroSection = () => {
   return (
@@ -35,14 +34,83 @@ const HeroSection = () => {
           </div>
           <div className="relative">
             <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 blur-2xl opacity-50 animate-subtle-glow"></div>
-            <Image
-              src="https://placehold.co/600x400.png"
-              alt="Futuristic Web3 analytics dashboard for Solana and EVM"
-              width={600}
-              height={400}
-              className="rounded-xl shadow-2xl relative z-10 transform transition-all duration-500 hover:scale-105"
-              data-ai-hint="web3 blockchain solana"
-            />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 600 400"
+              className="rounded-xl shadow-2xl relative z-10 transform transition-all duration-500 hover:scale-105 w-full h-auto"
+              aria-labelledby="heroSvgTitle"
+            >
+              <title id="heroSvgTitle">Abstract representation of interconnected planets and data paths in a network</title>
+              <defs>
+                <radialGradient id="gradPlanet1Hero" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                  <stop offset="0%" style={{stopColor: 'hsl(var(--primary))', stopOpacity: 1}} />
+                  <stop offset="100%" style={{stopColor: 'hsl(var(--primary) / 0.6)', stopOpacity: 1}} />
+                </radialGradient>
+                <radialGradient id="gradPlanet2Hero" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                  <stop offset="0%" style={{stopColor: 'hsl(var(--accent))', stopOpacity: 1}} />
+                  <stop offset="100%" style={{stopColor: 'hsl(var(--accent) / 0.6)', stopOpacity: 1}} />
+                </radialGradient>
+                 <filter id="svgPathGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {/* Planets */}
+              <circle cx="100" cy="120" r="40" fill="url(#gradPlanet1Hero)" />
+              <circle cx="480" cy="100" r="60" fill="url(#gradPlanet2Hero)" />
+              <circle cx="250" cy="300" r="30" fill="url(#gradPlanet1Hero)" />
+              <circle cx="500" cy="320" r="20" fill="url(#gradPlanet2Hero)" />
+              <circle cx="350" cy="180" r="25" fill="hsl(var(--muted))" opacity="0.5" />
+
+
+              {/* Flight Paths */}
+              <path
+                d="M100,120 Q250,50 480,100"
+                stroke="hsl(var(--accent))"
+                fill="none"
+                className="animate-pulsate-path"
+                style={{ animationDelay: '0s' }}
+              />
+              <path
+                d="M100,120 Q150,250 250,300"
+                stroke="hsl(var(--primary))"
+                fill="none"
+                className="animate-pulsate-path"
+                style={{ animationDelay: '0.4s' }}
+              />
+              <path
+                d="M250,300 Q380,250 480,100"
+                stroke="hsl(var(--accent))"
+                fill="none"
+                className="animate-pulsate-path"
+                style={{ animationDelay: '0.8s' }}
+              />
+               <path
+                d="M480,100 C550,200 550,280 500,320"
+                stroke="hsl(var(--primary))"
+                fill="none"
+                className="animate-pulsate-path"
+                style={{ animationDelay: '1.2s' }}
+              />
+              <path
+                d="M100,120 C200,180 300,170 350,180"
+                stroke="hsl(var(--accent))"
+                fill="none"
+                className="animate-pulsate-path"
+                style={{ animationDelay: '1.6s' }}
+              />
+               <path
+                d="M350,180 C400,190 450,250 500,320"
+                stroke="hsl(var(--primary))"
+                fill="none"
+                className="animate-pulsate-path"
+                style={{ animationDelay: '2s' }}
+              />
+            </svg>
           </div>
         </div>
       </div>
