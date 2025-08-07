@@ -27,6 +27,7 @@ import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
+import { MdLocalDining } from "react-icons/md"
 import { useDispatch, useSelector } from "react-redux"
 import * as z from "zod"
 
@@ -145,15 +146,22 @@ export default function LoginPage() {
                 type="submit"
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-full py-3 text-lg shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
               >
-                Login <ArrowRight className="ml-2 h-5 w-5" />
+                {_platformUserLoginLoad ? (
+                  <MdLocalDining />
+                ) : (
+                  <>
+                    {" "}
+                    Login <ArrowRight className="ml-2 h-5 w-5" />
+                  </>
+                )}
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
-          <Link href="#" className="text-sm text-accent hover:underline">
+          {/* <Link href="#" className="text-sm text-accent hover:underline">
             Forgot password?
-          </Link>
+          </Link> */}
           <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link

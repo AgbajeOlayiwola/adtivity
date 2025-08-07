@@ -99,8 +99,8 @@ const calculateDashboardMetrics = (events: any) => {
 }
 
 export default function KpiDashboardPage() {
-  const [rawEvents, setRawEvents] = useState([])
-  const [analyticsData, setAnalyticsData] = useState({
+  const [rawEvents, setRawEvents] = useState<any[]>([])
+  const [analyticsData, setAnalyticsData] = useState<any>({
     uniqueSessions: 0,
     uniqueButtonNames: [],
     uniquePagePaths: [],
@@ -128,18 +128,24 @@ export default function KpiDashboardPage() {
   } = useCompanyDataQuery({ id: documents?.id })
 
   const {
-    data: web3Events,
+    data: web3EventsRaw,
     isLoading: isWeb3Loading,
     isSuccess: isWeb3Success,
     isError: isWeb3Error,
     error: web3Error,
   } = useCompanyWeb3EventsQuery({ id: documents?.id })
 
+  // Ensure web3Events is always an array
+  const web3Events = Array.isArray(web3EventsRaw) ? web3EventsRaw : []
+
   useEffect(() => {
     // Check if both queries have successfully returned data
     if (isWeb2Success && isWeb3Success) {
       // Combine the events from both API calls into a single array
-      const combinedEvents = [...web2Events, ...web3Events]
+      const combinedEvents = [
+        ...(Array.isArray(web2Events) ? web2Events : []),
+        ...(Array.isArray(web3Events) ? web3Events : []),
+      ]
       setRawEvents(combinedEvents) // Store the combined raw events
       const processedData = calculateDashboardMetrics(combinedEvents)
       setAnalyticsData(processedData)
@@ -371,7 +377,7 @@ export default function KpiDashboardPage() {
                   <SelectValue placeholder="Select a button" />
                 </SelectTrigger>
                 <SelectContent>
-                  {analyticsData.uniqueButtonNames.map((buttonName) => (
+                  {analyticsData.uniqueButtonNames.map((buttonName: any) => (
                     <SelectItem key={buttonName} value={buttonName}>
                       {buttonName}
                     </SelectItem>
@@ -464,7 +470,7 @@ export default function KpiDashboardPage() {
                 <SelectValue placeholder="Select a page" />
               </SelectTrigger>
               <SelectContent>
-                {analyticsData.uniquePagePaths.map((path) => (
+                {analyticsData.uniquePagePaths.map((path: any) => (
                   <SelectItem key={path} value={path}>
                     {path}
                   </SelectItem>

@@ -25,6 +25,7 @@ import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
+import { MdLocalDining } from "react-icons/md"
 import { useDispatch } from "react-redux"
 import * as z from "zod"
 
@@ -232,7 +233,14 @@ export default function LoginPage() {
                 type="submit"
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-full py-3 text-lg shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
               >
-                Sign up <ArrowRight className="ml-2 h-5 w-5" />
+                {_createPlatformUserLoad ? (
+                  <MdLocalDining />
+                ) : (
+                  <>
+                    Sign up
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </>
+                )}
               </Button>
             </form>
           </Form>
