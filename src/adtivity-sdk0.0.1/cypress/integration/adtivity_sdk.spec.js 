@@ -1,0 +1,55 @@
+// cypress/integration/adtivity_sdk.spec.js (example Cypress test)
+
+describe('Adtivity SDK E2E Tracking', () => {
+    beforeEach(() => {
+        // Clear any previous SDK state in the browser
+        cy.clearLocalStorage();
+        cy.clearSessionStorage();
+        // Visit your test HTML page that includes the SDK
+        cy.visit('http://localhost:8080/test/e2e/index.html');
+        // You might need to wait for the SDK to fully initialize or for initial events to flush
+        cy.wait(2000); // Give SDK time to initialize and send initial page view
+        // Clear any events on your test backend before each test
+        cy.request('POST', 'http://localhost:3001/clear-events');
+    });
+
+    it('should track a custom event when a button is clicked', () => {
+        cy.get('#ctaButton').click();
+        // Wait for the event to be flushed (e.g., after batch interval)
+        cy.wait(adtivityConfig.flushInterval + 500); // Wait for SDK to flush
+
+        // Assert that the event was received by your test backend
+        cy.request('GET', 'http://localhost:3001/get-events').then((response) => {
+            expect(response.body).to.have.lengthOf(2); // Initial page view + button click
+            expect(response.body[1].eventName).to.equal('Special Offer Clicked');
+            expect(response.body[1].properties.campaign).to.equal('Summer Sale');
+            expect(response.body[1].properties.anonymousId).to.be.a('string');
+        });
+    });
+
+    it('should track automatic page views for SPA navigation', () => {
+        // Simulate SPA navigation
+        cy.window().then((win) => {
+            win.history.pushState({}, '', '/new-spa-page');
+        });
+        cy.wait(adtivityConfig.flushInterval + 500);
+
+        cy.request('GET', 'http://localhost:3001/get-events').then((response) => {
+            const pageViewEvents = response.body.filter(e => e.eventName === 'Page Viewed');
+            expect(pageViewEvents).to.have.lengthOf(2); // Initial + SPA page view
+            expect(pageViewEvents[1].properties.path).to.equal('/new-spa-page');
+        });
+    });
+
+    it('should respect consent settings', () => {
+        cy.get('#consentOptOutButton').click();
+        cy.get('#ctaButton').click(); // Click after opt-out
+        cy.wait(adtivityConfig.flushInterval + 500);
+
+        cy.request('GET', 'http://localhost:3001/get-events').then((response) => {
+            // Only the initial page view should be present if it happened before opt-out
+            const trackedEvents = response.body.filter(e => e.eventName !== 'Page Viewed');
+            expect(trackedEvents).to.have.lengthOf(0); // No new events after opt-out
+        });
+    });
+});

@@ -62,8 +62,11 @@ export default function DashboardLayout({
     error: userInfoErr,
     refetch: userInfoReset,
   }: any = useUseInfoQuery(null)
-
-  dispatch(setProfile(userInfoData))
+  React.useEffect(() => {
+    if (userInfoSuccess) {
+      dispatch(setProfile(userInfoData))
+    }
+  }, [userInfoSuccess])
 
   return (
     <SidebarProvider defaultOpen>

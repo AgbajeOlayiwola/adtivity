@@ -163,7 +163,7 @@ export default function KpiDashboardPage() {
     web2Error,
     web3Error,
   ])
-
+  console.log(documents)
   // Use a memoized value to calculate the filtered click count to avoid unnecessary re-renders.
   const totalHeroClicks = useMemo(() => {
     if (!rawEvents.length) return 0
@@ -353,6 +353,11 @@ export default function KpiDashboardPage() {
         <h1 className="text-3xl font-headline font-semibold tracking-tight">
           Business Overview
         </h1>
+        <div className="rounded-xl px-3 py-4 w-full">
+          <p className="text-[#fff] text-[17px]">
+            Keep this key safe {documents?.key}
+          </p>
+        </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
           {kpiData.map((kpi) => (
             <KpiCard key={kpi.title} {...kpi} />

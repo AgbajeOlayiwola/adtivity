@@ -30,6 +30,7 @@ type LoginFormValues = z.infer<typeof nameSchema>
 const Dashboard = () => {
   const [modal, setModal] = useState(false)
   const { profile }: any = useSelector((store) => store)
+  const { documents }: any = useSelector((store) => store)
   const dispatch = useDispatch()
   const {
     data: getClientCompaniesData,
@@ -67,6 +68,13 @@ const Dashboard = () => {
   useEffect(() => {
     if (createClientCompanySuccess) {
       setModal((prev: boolean) => !prev)
+      console.log(createClientCompanyData)
+      dispatch(
+        setDocuments([
+          ...documents,
+          { apiKey: createClientCompanyData?.api_key },
+        ])
+      )
       getClientCompaniesReset()
     } else if (createClientCompanyErr) {
       console.error("Login error:", createClientCompanyErr)
