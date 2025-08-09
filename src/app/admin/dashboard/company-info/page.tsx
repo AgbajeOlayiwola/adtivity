@@ -355,7 +355,7 @@ export default function KpiDashboardPage() {
         </h1>
         <div className="rounded-xl px-3 py-4 w-full">
           <p className="text-[#fff] text-[17px]">
-            Keep this key safe {documents?.key}
+            Keep this key safe {documents?.apiKey}
           </p>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
