@@ -20,6 +20,7 @@ import documentReducer from "../slices/documents"
 import merchantCountReducer from "../slices/merchantCount"
 import profileImageReducer from "../slices/profileImageSlice"
 import progileReducer from "../slices/profileSlice"
+import apikeyReducer from "../slices/qpikey"
 import tokenReducer from "../slices/userTokenSlice"
 import yearlyTargetReducer from "../slices/yearlyTargetSlice"
 const reducers = combineReducers({
@@ -32,6 +33,7 @@ const reducers = combineReducers({
   profieImage: profileImageReducer,
   merchantCount: merchantCountReducer,
   documents: documentReducer,
+  apikey: apikeyReducer,
 })
 
 const persistConfig = {
@@ -45,6 +47,8 @@ const persistConfig = {
     "profieImage",
     "merchantCount",
     "documents",
+    "apikeyReducer",
+    "apikey",
   ],
 }
 

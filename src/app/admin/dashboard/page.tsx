@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { useCreateClientCompanyMutation } from "@/redux/api/mutationApi"
 import { useGetClientCompaniesQuery } from "@/redux/api/queryApi"
 import { setDocuments } from "@/redux/slices/documents"
+import { setApikey } from "@/redux/slices/qpikey"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderIcon } from "lucide-react"
 import { useEffect, useState } from "react"
@@ -69,12 +70,7 @@ const Dashboard = () => {
     if (createClientCompanySuccess) {
       setModal((prev: boolean) => !prev)
       console.log(createClientCompanyData)
-      dispatch(
-        setDocuments([
-          ...documents,
-          { apiKey: createClientCompanyData?.api_key },
-        ])
-      )
+      dispatch(setApikey({ apiKey: createClientCompanyData?.api_key }))
       getClientCompaniesReset()
     } else if (createClientCompanyErr) {
       console.error("Login error:", createClientCompanyErr)

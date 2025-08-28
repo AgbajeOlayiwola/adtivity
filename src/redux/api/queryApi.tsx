@@ -47,10 +47,18 @@ export const queryApi = createApi({
         }
       },
     }),
+    getRegionalData: builder.query({
+      query: ({ id }: any) => {
+        return {
+          url: `/analytics/regions/${id}?start_date=2025-01-01`,
+        }
+      },
+    }),
   }),
 })
 
 export const {
+  useGetRegionalDataQuery,
   useCompanyWeb3EventsQuery,
   useGetClientCompaniesQuery,
   useUseInfoQuery,

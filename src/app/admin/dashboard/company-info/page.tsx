@@ -8,35 +8,31 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
+import { ChartContainer } from "@/components/ui/chart"
 import {
   Eye,
   FilePlus2,
+  RefreshCcw,
   Repeat,
   Target,
+  Trash2,
   TrendingUp,
   Users,
   Wallet,
+  X,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useSelector } from "react-redux"
 import {
-  Bar,
   CartesianGrid,
   Line,
   LineChart,
-  BarChart as RechartsBarChart,
   Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
 } from "recharts"
 
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -45,45 +41,65 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
   useCompanyDataQuery,
   useCompanyWeb3EventsQuery,
+  useGetRegionalDataQuery,
 } from "@/redux/api/queryApi"
+
+// Date picker components
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { Calendar as CalendarIcon } from "lucide-react"
 
 const chartConfig = {
   sales: { label: "Sales", color: "hsl(var(--chart-1))" },
   revenue: { label: "Revenue", color: "hsl(var(--chart-2))" },
   views: { label: "Page Views", color: "hsl(var(--accent))" },
+  clicks: { label: "Clicks", color: "hsl(var(--purple-500))" },
 }
 
 // Helper function to process raw event data from the API and prepare it for the dashboard.
 const calculateDashboardMetrics = (events: any) => {
   const sessions = new Set()
-  // Find all unique "Hero" and "CTA" button click names
   const heroClicks = events.filter(
     (event: any) =>
       event.event_name.startsWith("Hero:") ||
-      event.event_name.startsWith("CTA:")
+      event.event_name.startsWith("Button:")
   )
   const uniqueButtonNames = [
     "All Clicks",
     ...new Set(heroClicks.map((event: any) => event.event_name)),
   ]
 
-  // Extract all unique page paths from the combined events
-  const uniquePagePaths = [
-    "All Pages",
-    ...new Set(
-      events
-        .filter(
-          (event: any) =>
-            event.event_name === "Page Viewed" ||
-            event.event_name === "Page Loaded"
-        )
-        .map((event: any) => event.properties?.path)
-    ),
+  const pageEvents = events.filter(
+    (event: any) =>
+      event.event_name === "Page Viewed" || event.event_name === "Page Loaded"
+  )
+
+  const uniquePageEventNames = [
+    "All Page Events",
+    ...new Set(pageEvents.map((event: any) => event.event_name)),
   ]
 
-  // Populate the sessions set
+  const uniquePagePaths = [
+    "All Pages",
+    ...new Set(pageEvents.map((event: any) => event.properties?.path)),
+  ]
+
   events.forEach((event: any) => {
     if (event.properties?.sessionId) {
       sessions.add(event.properties.sessionId)
@@ -91,25 +107,111 @@ const calculateDashboardMetrics = (events: any) => {
   })
 
   return {
-    heroClicks, // Return the full array of hero clicks
+    heroClicks,
     uniqueSessions: sessions.size,
     uniqueButtonNames,
     uniquePagePaths,
+    uniquePageEventNames,
   }
 }
 
+// Custom Modal Component
+const Modal = ({
+  isOpen,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmText = "Confirm",
+}: any) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <Card className="w-full max-w-sm p-6 bg-card/95 backdrop-blur-sm shadow-xl relative">
+        <button
+          onClick={onCancel}
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{message}</p>
+          <div className="mt-6 flex justify-end space-x-2">
+            <Button variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={onConfirm}>
+              {confirmText}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// New component for the regional data table
+const RegionalDataTable = ({ data }: { data: any }) => {
+  if (!data || data.regions.length === 0) {
+    return <p className="text-muted-foreground">No regional data available.</p>
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Country</TableHead>
+            <TableHead>Region</TableHead>
+            <TableHead>City</TableHead>
+            <TableHead>User Count</TableHead>
+            <TableHead>Event Count</TableHead>
+            <TableHead>Conversion Rate</TableHead>
+            <TableHead>Revenue (USD)</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.regions.map((region: any, index: number) => (
+            <TableRow key={index}>
+              <TableCell>{region.country}</TableCell>
+              <TableCell>{region.region}</TableCell>
+              <TableCell>{region.city}</TableCell>
+              <TableCell>{region.user_count}</TableCell>
+              <TableCell>{region.event_count}</TableCell>
+              <TableCell>{region.conversion_rate ?? "N/A"}</TableCell>
+              <TableCell>{region.revenue_usd ?? "N/A"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
 export default function KpiDashboardPage() {
-  const [rawEvents, setRawEvents] = useState<any[]>([])
+  const [rawEvents, setRawEvents] = useState<any>([])
   const [analyticsData, setAnalyticsData] = useState<any>({
     uniqueSessions: 0,
     uniqueButtonNames: [],
     uniquePagePaths: [],
+    uniquePageEventNames: [],
   })
   const [selectedButton, setSelectedButton] = useState("All Clicks")
   const [selectedPage, setSelectedPage] = useState("All Pages")
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false)
+
+  // State for start and end dates
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  const [endDate, setEndDate] = useState<Date | null>(null)
+
   const { documents }: any = useSelector((store) => store)
+  const { apikey }: any = useSelector((store) => store)
   const [salesData, setSalesData] = useState([
-    // Placeholder sales data for the BarChart
     { month: "Jan", sales: 1500, revenue: 35000 },
     { month: "Feb", sales: 1800, revenue: 42000 },
     { month: "Mar", sales: 1650, revenue: 38000 },
@@ -118,14 +220,14 @@ export default function KpiDashboardPage() {
     { month: "Jun", sales: 2050, revenue: 49000 },
   ])
 
-  // --- Use two separate queries to fetch both Web2 and Web3 events ---
+  // Update queries to accept start and end dates
   const {
     data: web2Events,
     isLoading: isWeb2Loading,
     isSuccess: isWeb2Success,
     isError: isWeb2Error,
     error: web2Error,
-  } = useCompanyDataQuery({ id: documents?.id })
+  } = useCompanyDataQuery({ id: documents?.id, startDate, endDate })
 
   const {
     data: web3EventsRaw,
@@ -133,23 +235,29 @@ export default function KpiDashboardPage() {
     isSuccess: isWeb3Success,
     isError: isWeb3Error,
     error: web3Error,
-  } = useCompanyWeb3EventsQuery({ id: documents?.id })
+  } = useCompanyWeb3EventsQuery({ id: documents?.id, startDate, endDate })
 
-  // Ensure web3Events is always an array
+  const {
+    data: getRegionalData,
+    isLoading: getRegionalDataLoading,
+    isSuccess: getRegionalDataSuccess,
+    isError: getRegionalDataIsError,
+    error: getRegionalDataError,
+  } = useGetRegionalDataQuery({ id: documents?.id, startDate, endDate })
+
   const web3Events = Array.isArray(web3EventsRaw) ? web3EventsRaw : []
 
   useEffect(() => {
-    // Check if both queries have successfully returned data
     if (isWeb2Success && isWeb3Success) {
-      // Combine the events from both API calls into a single array
       const combinedEvents = [
         ...(Array.isArray(web2Events) ? web2Events : []),
         ...(Array.isArray(web3Events) ? web3Events : []),
       ]
-      setRawEvents(combinedEvents) // Store the combined raw events
+      setRawEvents(combinedEvents)
       const processedData = calculateDashboardMetrics(combinedEvents)
       setAnalyticsData(processedData)
       setSelectedButton("All Clicks")
+      setSelectedPage("All Pages")
     } else if (isWeb2Error || isWeb3Error) {
       console.error("Failed to fetch analytics data:", web2Error || web3Error)
     }
@@ -163,26 +271,22 @@ export default function KpiDashboardPage() {
     web2Error,
     web3Error,
   ])
-  console.log(documents)
-  // Use a memoized value to calculate the filtered click count to avoid unnecessary re-renders.
+
+  // Memoized values for charts and KPIs
   const totalHeroClicks = useMemo(() => {
     if (!rawEvents.length) return 0
-
-    // Filter events based on the selected button
     const filteredClicks = rawEvents.filter((event: any) => {
       if (selectedButton === "All Clicks") {
         return (
-          event.event_name.startsWith("Hero:") ||
-          event.event_name.startsWith("CTA:")
+          event.event_name.startsWith("Button:") ||
+          event.event_name.startsWith("Button:")
         )
       }
       return event.event_name === selectedButton
     })
-
     return filteredClicks.length
   }, [rawEvents, selectedButton])
 
-  // Memoized value for total page views
   const totalPageViews = useMemo(() => {
     if (!rawEvents.length) return 0
     return rawEvents.filter(
@@ -194,10 +298,8 @@ export default function KpiDashboardPage() {
     ).length
   }, [rawEvents, selectedPage])
 
-  // Memoized value to calculate daily page views for the chart based on the selected page
   const pageViewsChartData = useMemo(() => {
     if (!rawEvents.length) return []
-
     const dailyPageViews = rawEvents
       .filter(
         (event: any) =>
@@ -214,15 +316,36 @@ export default function KpiDashboardPage() {
         acc[date] = (acc[date] || 0) + 1
         return acc
       }, {})
-
-    // Format the daily page views for the Recharts line chart
     return Object.entries(dailyPageViews).map(([date, views]) => ({
       date,
       views,
     }))
   }, [rawEvents, selectedPage])
 
-  // Memoized Web3 KPI calculations
+  const clicksChartData = useMemo(() => {
+    if (!rawEvents.length) return []
+    const dailyClicks = rawEvents
+      .filter(
+        (event: any) =>
+          (selectedButton === "All Clicks" &&
+            (event.event_name.startsWith("Button:") ||
+              event.event_name.startsWith("Button:"))) ||
+          event.event_name === selectedButton
+      )
+      .reduce((acc: any, event: any) => {
+        const date = new Date(event.timestamp).toLocaleDateString("en-US", {
+          month: "2-digit",
+          day: "2-digit",
+        })
+        acc[date] = (acc[date] || 0) + 1
+        return acc
+      }, {})
+    return Object.entries(dailyClicks).map(([date, clicks]) => ({
+      date,
+      clicks,
+    }))
+  }, [rawEvents, selectedButton])
+
   const web3Kpis = useMemo(() => {
     if (!web3Events || web3Events.length === 0) {
       return {
@@ -232,24 +355,19 @@ export default function KpiDashboardPage() {
         tokenSymbol: "N/A",
       }
     }
-
     const tokenTransfers = web3Events.filter(
-      (event: any) => event.event_name === "Token Transferred"
+      (event) => event.event_name === "Token Transferred"
     )
-
-    // Calculate unique active wallets
     const uniqueWallets = new Set(
-      tokenTransfers.map((event: any) => event.properties?.wallet_address)
+      tokenTransfers.map((event) => event.wallet_address)
     )
-
-    // Calculate total transaction volume for the last 24 hours
     const now = new Date()
     const oneDayAgo = now.getTime() - 24 * 60 * 60 * 1000
     let totalVolume = 0
     let tokenSymbol = ""
 
-    tokenTransfers.forEach((event: any) => {
-      const eventTimestamp = new Date(event.properties?.timestamp).getTime()
+    tokenTransfers.forEach((event) => {
+      const eventTimestamp = new Date(event.timestamp).getTime()
       if (eventTimestamp > oneDayAgo) {
         totalVolume += event.properties?.amount || 0
         if (!tokenSymbol) {
@@ -257,7 +375,6 @@ export default function KpiDashboardPage() {
         }
       }
     })
-
     return {
       totalTokenTransfers: tokenTransfers.length,
       activeWallets: uniqueWallets.size,
@@ -266,14 +383,7 @@ export default function KpiDashboardPage() {
     }
   }, [web3Events])
 
-  // Dynamically create the KPI data based on the fetched analytics
   const kpiData = [
-    {
-      title: "Total Page Views",
-      value: totalPageViews.toLocaleString(),
-      icon: Eye,
-      iconColorClass: "text-accent",
-    },
     {
       title: "Unique Sessions",
       value: analyticsData.uniqueSessions.toLocaleString(),
@@ -281,14 +391,13 @@ export default function KpiDashboardPage() {
       iconColorClass: "text-green-500",
     },
     {
-      title: "Conversion Rate", // This KPI can't be calculated with the provided data, so it's a placeholder.
+      title: "Conversion Rate",
       value: "N/A",
       icon: TrendingUp,
       iconColorClass: "text-yellow-500",
     },
   ]
 
-  // The Web3 KPIs are now populated with real data
   const web3KpiData = [
     {
       title: "Total Token Transfers",
@@ -322,9 +431,24 @@ export default function KpiDashboardPage() {
     },
   ]
 
-  // Use a combined loading state
-  const isLoading = isWeb2Loading || isWeb3Loading
-  const error = isWeb2Error ? web2Error : isWeb3Error ? web3Error : null
+  const isLoading = isWeb2Loading || isWeb3Loading || getRegionalDataLoading
+  const error = isWeb2Error
+    ? web2Error
+    : isWeb3Error
+    ? web3Error
+    : getRegionalDataIsError
+    ? getRegionalDataError
+    : null
+
+  const handleDeleteEvents = () => {
+    console.log("Deleting all events...")
+    setShowDeleteModal(false)
+  }
+
+  const handleRegenerateApiKey = () => {
+    console.log("Regenerating API key...")
+    setShowRegenerateModal(false)
+  }
 
   if (isLoading) {
     return (
@@ -349,20 +473,128 @@ export default function KpiDashboardPage() {
 
   return (
     <div className="space-y-8">
+      <Modal
+        isOpen={showDeleteModal}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete all historical events? This action cannot be undone."
+        onConfirm={handleDeleteEvents}
+        onCancel={() => setShowDeleteModal(false)}
+        confirmText="Delete"
+      />
+      <Modal
+        isOpen={showRegenerateModal}
+        title="Regenerate API Key"
+        message="Are you sure you want to regenerate the API key? The old key will become invalid."
+        onConfirm={handleRegenerateApiKey}
+        onCancel={() => setShowRegenerateModal(false)}
+        confirmText="Regenerate"
+      />
       <div>
         <h1 className="text-3xl font-headline font-semibold tracking-tight">
           Business Overview
         </h1>
         <div className="rounded-xl px-3 py-4 w-full">
-          <p className="text-[#fff] text-[17px]">
-            Keep this key safe {documents?.apiKey}
-          </p>
+          <div className="flex justify-between items-center">
+            <p className="text-[#fff] text-[17px]">
+              Keep this key safe: {apikey?.apiKey}
+            </p>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowRegenerateModal(true)}
+                className="text-purple-500 hover:text-purple-600 border-purple-500"
+              >
+                <RefreshCcw className="h-4 w-4 mr-2" />
+                Regenerate
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteModal(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete All Events
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-4 items-center">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !startDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={startDate}
+                onSelect={setStartDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !endDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={endDate}
+                onSelect={setEndDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Page Views
+              </CardTitle>
+              <Eye className="h-4 w-4 text-accent" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {totalPageViews.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Views based on selected path
+              </p>
+              <Select value={selectedPage} onValueChange={setSelectedPage}>
+                <SelectTrigger className="w-[180px] mt-2">
+                  <SelectValue placeholder="Select a page" />
+                </SelectTrigger>
+                <SelectContent>
+                  {analyticsData.uniquePagePaths.map((path) => (
+                    <SelectItem key={path} value={path}>
+                      {path}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
           {kpiData.map((kpi) => (
             <KpiCard key={kpi.title} {...kpi} />
           ))}
-          {/* Custom Card for Total Hero Clicks with a Select dropdown */}
           <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
@@ -382,7 +614,7 @@ export default function KpiDashboardPage() {
                   <SelectValue placeholder="Select a button" />
                 </SelectTrigger>
                 <SelectContent>
-                  {analyticsData.uniqueButtonNames.map((buttonName: any) => (
+                  {analyticsData.uniqueButtonNames.map((buttonName) => (
                     <SelectItem key={buttonName} value={buttonName}>
                       {buttonName}
                     </SelectItem>
@@ -393,7 +625,6 @@ export default function KpiDashboardPage() {
           </Card>
         </div>
       </div>
-
       <div>
         <h2 className="text-2xl font-headline font-semibold tracking-tight">
           Key Web3 Metrics
@@ -404,62 +635,26 @@ export default function KpiDashboardPage() {
           ))}
         </div>
       </div>
-
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg col-span-2">
           <CardHeader>
             <CardTitle className="font-headline flex items-center">
-              <TrendingUp className="mr-2 h-5 w-5 text-primary" /> Sales &
-              Revenue Overview
+              <TrendingUp className="mr-2 h-5 w-5 text-primary" /> Regional Data
             </CardTitle>
             <CardDescription>
-              Monthly sales and revenue for the last 6 months.
+              Regional analytics data in a table format.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <RechartsBarChart data={salesData} accessibilityLayer>
-                <CartesianGrid
-                  vertical={false}
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border)/0.5)"
-                />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis
-                  yAxisId="left"
-                  orientation="left"
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar
-                  yAxisId="left"
-                  dataKey="sales"
-                  fill="var(--color-sales)"
-                  radius={4}
-                />
-                <Bar
-                  yAxisId="right"
-                  dataKey="revenue"
-                  fill="var(--color-revenue)"
-                  radius={4}
-                />
-              </RechartsBarChart>
-            </ChartContainer>
+            {getRegionalData ? (
+              <RegionalDataTable data={getRegionalData} />
+            ) : (
+              <p className="text-muted-foreground">
+                No regional data to display.
+              </p>
+            )}
           </CardContent>
         </Card>
-
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader className="flex flex-row items-start justify-between space-x-2">
             <div>
@@ -475,7 +670,7 @@ export default function KpiDashboardPage() {
                 <SelectValue placeholder="Select a page" />
               </SelectTrigger>
               <SelectContent>
-                {analyticsData.uniquePagePaths.map((path: any) => (
+                {analyticsData.uniquePagePaths.map((path) => (
                   <SelectItem key={path} value={path}>
                     {path}
                   </SelectItem>
@@ -517,6 +712,71 @@ export default function KpiDashboardPage() {
                     fill: "var(--color-views)",
                     strokeWidth: 2,
                     stroke: "hsl(var(--background))",
+                  }}
+                  activeDot={{ r: 7 }}
+                />
+              </LineChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
+          <CardHeader className="flex flex-row items-start justify-between space-x-2">
+            <div>
+              <CardTitle className="font-headline flex items-center">
+                <Target className="mr-2 h-5 w-5 text-purple-500" /> Daily Button
+                Clicks
+              </CardTitle>
+              <CardDescription>
+                Buttons clicked over the last 7 days.
+              </CardDescription>
+            </div>
+            <Select value={selectedButton} onValueChange={setSelectedButton}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select a button" />
+              </SelectTrigger>
+              <SelectContent>
+                {analyticsData.uniqueButtonNames.map((buttonName) => (
+                  <SelectItem key={buttonName} value={buttonName}>
+                    {buttonName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[300px] w-full">
+              <LineChart data={clicksChartData} accessibilityLayer>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border)/0.5)"
+                />
+                <XAxis
+                  dataKey="date"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={10}
+                  stroke="hsl(var(--muted-foreground))"
+                />
+                <YAxis stroke="hsl(var(--muted-foreground))" />
+                <RechartsTooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                  }}
+                  labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                  itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="clicks"
+                  stroke="hsl(var(--purple-500))"
+                  strokeWidth={3}
+                  dot={{
+                    r: 5,
+                    fill: "purple",
+                    strokeWidth: 2,
+                    stroke: "#fff",
                   }}
                   activeDot={{ r: 7 }}
                 />
