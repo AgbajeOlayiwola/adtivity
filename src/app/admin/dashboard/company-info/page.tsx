@@ -813,7 +813,7 @@ export default function KpiDashboardPage() {
                   <SelectValue placeholder="Select a page" />
                 </SelectTrigger>
                 <SelectContent>
-                  {analyticsDataI.uniquePagePaths.map((path: any) => (
+                  {analyticsData.uniquePagePaths.map((path: any) => (
                     <SelectItem key={path} value={path}>
                       {path}
                     </SelectItem>

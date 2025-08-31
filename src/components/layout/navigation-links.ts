@@ -27,19 +27,25 @@ export const mainNavLinks: NavLink[] = [
   },
   {
     href: "/admin/anomalies",
-    label: "Anomaly Alerts",
-    icon: AlertTriangle,
-    group: "Analytics",
-  },
-  {
-    href: "/admin/forecasting",
-    label: "Predictive Forecasting",
+    label: "Twitter Analytics (Coming Soon)",
     icon: TrendingUp,
     group: "Analytics",
   },
   {
+    href: "/admin/anomalies",
+    label: "AI Analysis (Coming Soon)",
+    icon: AlertTriangle,
+    group: "Analytics",
+  },
+  // {
+  //   href: "/admin/forecasting",
+  //   label: "Predictive Forecasting (Coming Soon)",
+  //   icon: TrendingUp,
+  //   group: "Analytics",
+  // },
+  {
     href: "/admin/reports",
-    label: "Custom Reports",
+    label: "Custom Reports (Coming Soon)",
     icon: FileText,
     group: "Reporting",
   },
