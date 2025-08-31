@@ -40,19 +40,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  useCompanyDataQuery,
-  useCompanyWeb3EventsQuery,
-  useGetRegionalDataQuery,
-} from "@/redux/api/queryApi"
 
 // Date picker components
 import { Calendar } from "@/components/ui/calendar"
@@ -65,6 +52,25 @@ import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 
+import {
+  useCompanyDataQuery,
+  useCompanyWeb3EventsQuery,
+  useGetRegionalDataQuery,
+  useGetUniqueSessionsQuery,
+} from "@/redux/api/queryApi"
+import { scaleSequential } from "d3-scale"
+import { interpolateReds } from "d3-scale-chromatic"
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  Sphere,
+  ZoomableGroup,
+} from "react-simple-maps"
+import { Tooltip } from "react-tooltip"
+
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"
+
 const chartConfig = {
   sales: { label: "Sales", color: "hsl(var(--chart-1))" },
   revenue: { label: "Revenue", color: "hsl(var(--chart-2))" },
@@ -72,7 +78,6 @@ const chartConfig = {
   clicks: { label: "Clicks", color: "hsl(var(--purple-500))" },
 }
 
-// Helper function to process raw event data from the API and prepare it for the dashboard.
 const calculateDashboardMetrics = (events: any) => {
   const sessions = new Set()
   const heroClicks = events.filter(
@@ -115,7 +120,6 @@ const calculateDashboardMetrics = (events: any) => {
   }
 }
 
-// Custom Modal Component
 const Modal = ({
   isOpen,
   title,
@@ -154,47 +158,240 @@ const Modal = ({
   )
 }
 
-// New component for the regional data table
-const RegionalDataTable = ({ data }: { data: any }) => {
-  if (!data || data.regions.length === 0) {
-    return <p className="text-muted-foreground">No regional data available.</p>
+const RegionalHeatmap = ({
+  data,
+  selectedCountry,
+}: {
+  data: any
+  selectedCountry: string
+}) => {
+  const [tooltipContent, setTooltipContent] = useState("")
+  const [geos, setGeos] = useState<any>(null)
+  const [hoveredCountry, setHoveredCountry] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(geoUrl)
+      .then((response) => response.json())
+      .then((data) => {
+        setGeos(data.objects.countries.geometries)
+      })
+      .catch((error) => console.error("Error fetching geo data:", error))
+  }, [])
+
+  const isoToCountryNameMap: { [key: string]: string } = {
+    GB: "United Kingdom",
+    NG: "Nigeria",
+    US: "United States of America",
+    CA: "Canada",
+    AU: "Australia",
+    DE: "Germany",
+    FR: "France",
+    JP: "Japan",
+    CN: "China",
+    IN: "India",
+    BR: "Brazil",
+    RU: "Russia",
+  }
+
+  const countryDataMap = useMemo(() => {
+    type CityData = number
+    type RegionData = {
+      totalEvents: number
+      cities: { [city: string]: CityData }
+    }
+    type CountryData = {
+      totalEvents: number
+      regions: { [region: string]: RegionData }
+    }
+    const aggregatedData: { [country: string]: CountryData } = {}
+    data.forEach((item: any) => {
+      const countryName = isoToCountryNameMap[item.country] || item.country
+      if (countryName && item.region && item.city) {
+        if (!aggregatedData[countryName]) {
+          aggregatedData[countryName] = { totalEvents: 0, regions: {} }
+        }
+        if (!aggregatedData[countryName].regions[item.region]) {
+          aggregatedData[countryName].regions[item.region] = {
+            totalEvents: 0,
+            cities: {},
+          }
+        }
+        if (
+          !aggregatedData[countryName].regions[item.region].cities[item.city]
+        ) {
+          aggregatedData[countryName].regions[item.region].cities[item.city] = 0
+        }
+        aggregatedData[countryName].totalEvents += item.event_count
+        aggregatedData[countryName].regions[item.region].totalEvents +=
+          item.event_count
+        aggregatedData[countryName].regions[item.region].cities[item.city] +=
+          item.event_count
+      }
+    })
+    return aggregatedData
+  }, [data, isoToCountryNameMap])
+  // const countryDataMap = useMemo(() => {
+  //   const aggregatedData: { [key: string]: any } = {}
+  //   data.forEach((item: any) => {
+  //     const countryName = isoToCountryNameMap[item.country] || item.country
+  //     if (countryName) {
+  //       if (!aggregatedData[countryName]) {
+  //         aggregatedData[countryName] = {
+  //           country: countryName,
+  //           totalEvents: 0,
+  //           regionalDetails: {},
+  //         }
+  //       }
+  //       aggregatedData[countryName].totalEvents += item.event_count
+  //       if (
+  //         item.region &&
+  //         !aggregatedData[countryName].regionalDetails[item.region]
+  //       ) {
+  //         aggregatedData[countryName].regionalDetails[item.region] = 0
+  //       }
+  //       if (item.region) {
+  //         aggregatedData[countryName].regionalDetails[item.region] +=
+  //           item.event_count
+  //       }
+  //     }
+  //   })
+  //   return aggregatedData
+  // }, [data, isoToCountryNameMap])
+
+  const colorScale = useMemo(() => {
+    const maxEvents = Math.max(
+      ...Object.values(countryDataMap).map((d: any) => d.totalEvents),
+      0
+    )
+    return scaleSequential(interpolateReds).domain([0, maxEvents])
+  }, [countryDataMap])
+
+  const handleCountryHover = (countryName: string) => {
+    setHoveredCountry(countryName)
+  }
+
+  const handleCountryLeave = () => {
+    setHoveredCountry(null)
+  }
+
+  if (!geos) {
+    return <p className="text-center text-muted-foreground">Loading map...</p>
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Country</TableHead>
-            <TableHead>Region</TableHead>
-            <TableHead>City</TableHead>
-            <TableHead>User Count</TableHead>
-            <TableHead>Event Count</TableHead>
-            <TableHead>Conversion Rate</TableHead>
-            <TableHead>Revenue (USD)</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.regions.map((region: any, index: number) => (
-            <TableRow key={index}>
-              <TableCell>{region.country}</TableCell>
-              <TableCell>{region.region}</TableCell>
-              <TableCell>{region.city}</TableCell>
-              <TableCell>{region.user_count}</TableCell>
-              <TableCell>{region.event_count}</TableCell>
-              <TableCell>{region.conversion_rate ?? "N/A"}</TableCell>
-              <TableCell>{region.revenue_usd ?? "N/A"}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="relative w-full h-[500px] overflow-hidden rounded-lg">
+      <ComposableMap
+        height={500}
+        projection="geoMercator"
+        data-tooltip-id="country-tooltip"
+      >
+        <Sphere stroke="#E4E5E6" strokeWidth={0.5} id={""} fill={""} />
+        <ZoomableGroup center={[0, 0]} zoom={1}>
+          <Geographies geography={geoUrl}>
+            {({ geographies }) => (
+              <>
+                {geographies.map((geo) => {
+                  const countryName = geo.properties.name
+                  const countryMetrics = countryDataMap[countryName]
+                  return (
+                    <Geography
+                      key={geo.rsmKey}
+                      geography={geo}
+                      onMouseEnter={() => {
+                        handleCountryHover(countryName)
+                        if (countryMetrics) {
+                          setTooltipContent(
+                            `${countryName}: ${countryMetrics.totalEvents} Events`
+                          )
+                        } else {
+                          setTooltipContent(`${countryName}: No Data`)
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        handleCountryLeave()
+                        setTooltipContent("")
+                      }}
+                      style={{
+                        default: {
+                          fill: countryMetrics
+                            ? colorScale(countryMetrics.totalEvents)
+                            : "#DEDEDE",
+                          stroke: "#FFFFFF",
+                          strokeWidth: 0.5,
+                          outline: "none",
+                        },
+                        hover: {
+                          fill: countryMetrics
+                            ? colorScale(countryMetrics.totalEvents)
+                            : "#DEDEDE",
+                          stroke: "#2C2C2C",
+                          strokeWidth: 0.75,
+                          outline: "none",
+                        },
+                        pressed: {
+                          fill: countryMetrics
+                            ? colorScale(countryMetrics.totalEvents)
+                            : "#DEDEDE",
+                          stroke: "#2C2C2C",
+                          strokeWidth: 0.75,
+                          outline: "none",
+                        },
+                      }}
+                    />
+                  )
+                })}
+              </>
+            )}
+          </Geographies>
+        </ZoomableGroup>
+      </ComposableMap>
+      <Tooltip id="country-tooltip" content={tooltipContent} />
+      <div className="absolute top-4 left-4 z-10 w-[250px]">
+        <Card className="bg-card/95 backdrop-blur-sm shadow-xl">
+          <CardHeader>
+            <CardTitle>{hoveredCountry}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Total Events:{" "}
+              {hoveredCountry && countryDataMap[hoveredCountry]?.totalEvents
+                ? countryDataMap[hoveredCountry]?.totalEvents
+                : "N/A"}
+            </p>
+            <div className="mt-2">
+              {hoveredCountry &&
+                Object.entries(
+                  countryDataMap[hoveredCountry]?.regions || {}
+                ).map(([region, regionData]) => (
+                  <div key={region} className="mb-2">
+                    <p className="text-sm font-semibold text-muted-foreground">
+                      {region}: {regionData.totalEvents} Events
+                    </p>
+                    <ul className="pl-4">
+                      {Object.entries(regionData.cities || {}).map(
+                        ([city, count]) => (
+                          <li
+                            key={city}
+                            className="text-xs text-muted-foreground list-disc"
+                          >
+                            {city}: {count} Events
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
 
 export default function KpiDashboardPage() {
   const [rawEvents, setRawEvents] = useState<any>([])
-  const [analyticsData, setAnalyticsData] = useState<any>({
+  const [analyticsData, setAnalyticsData] = useState({
     uniqueSessions: 0,
     uniqueButtonNames: [],
     uniquePagePaths: [],
@@ -205,9 +402,10 @@ export default function KpiDashboardPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showRegenerateModal, setShowRegenerateModal] = useState(false)
 
-  // State for start and end dates
-  const [startDate, setStartDate] = useState<Date | null>(null)
-  const [endDate, setEndDate] = useState<Date | null>(null)
+  const [startDate, setStartDate] = useState<Date | String | null>("2025-01-01")
+  const [endDate, setEndDate] = useState<Date | String | null>(null)
+
+  const [selectedCountry, setSelectedCountry] = useState("World View")
 
   const { documents }: any = useSelector((store) => store)
   const { apikey }: any = useSelector((store) => store)
@@ -220,7 +418,6 @@ export default function KpiDashboardPage() {
     { month: "Jun", sales: 2050, revenue: 49000 },
   ])
 
-  // Update queries to accept start and end dates
   const {
     data: web2Events,
     isLoading: isWeb2Loading,
@@ -243,8 +440,59 @@ export default function KpiDashboardPage() {
     isSuccess: getRegionalDataSuccess,
     isError: getRegionalDataIsError,
     error: getRegionalDataError,
-  } = useGetRegionalDataQuery({ id: documents?.id, startDate, endDate })
+  } = useGetRegionalDataQuery({
+    id: documents?.id,
+    start_date: startDate,
+    endDate,
+  })
+  const {
+    data: getUniqueSessionsData = { users_per_day: [], total_unique_users: 0 },
+    isLoading: getUniqueSessionsLoading,
+    isSuccess: getUniqueSessionsSuccess,
+    isError: getUniqueSessionsIsError,
+    error: getUniqueSessionsError,
+  } = useGetUniqueSessionsQuery({
+    id: documents?.id,
+    start_date: startDate,
+    endDate,
+  }) as {
+    data: {
+      users_per_day: Array<{ day: string; users: number }>
+      total_unique_users: number
+    }
+    isLoading: boolean
+    isSuccess: boolean
+    isError: boolean
+    error: any
+  }
+  // Inside your KpiDashboardPage component
+  const [analyticsDataI, setAnalyticsDataI] = useState<any>({
+    uniqueSessions: 0,
+    uniqueButtonNames: [],
+    uniquePagePaths: [],
+    uniquePageEventNames: [],
+    usersPerDayChartData: [], // Add a state for daily user data
+  })
 
+  const [selectedDay, setSelectedDay] = useState("All Days") // New state for the selected day
+
+  // Use a new useEffect to process the data from the endpoint
+  useEffect(() => {
+    if (getUniqueSessionsSuccess && getUniqueSessionsData) {
+      // Process data for the chart or daily breakdown
+      const usersByDay = getUniqueSessionsData.users_per_day.map((entry) => ({
+        day: entry.day,
+        users: entry.users,
+      }))
+      setAnalyticsDataI((prev) => ({
+        ...prev,
+        uniqueSessions: getUniqueSessionsData.total_unique_users,
+        usersPerDayChartData: usersByDay,
+      }))
+    }
+  }, [getUniqueSessionsSuccess, getUniqueSessionsData])
+
+  // ... rest of your component
   const web3Events = Array.isArray(web3EventsRaw) ? web3EventsRaw : []
 
   useEffect(() => {
@@ -272,7 +520,6 @@ export default function KpiDashboardPage() {
     web3Error,
   ])
 
-  // Memoized values for charts and KPIs
   const totalHeroClicks = useMemo(() => {
     if (!rawEvents.length) return 0
     const filteredClicks = rawEvents.filter((event: any) => {
@@ -359,7 +606,7 @@ export default function KpiDashboardPage() {
       (event) => event.event_name === "Token Transferred"
     )
     const uniqueWallets = new Set(
-      tokenTransfers.map((event) => event.wallet_address)
+      tokenTransfers.map((event) => event.properties?.wallet_address)
     )
     const now = new Date()
     const oneDayAgo = now.getTime() - 24 * 60 * 60 * 1000
@@ -384,12 +631,12 @@ export default function KpiDashboardPage() {
   }, [web3Events])
 
   const kpiData = [
-    {
-      title: "Unique Sessions",
-      value: analyticsData.uniqueSessions.toLocaleString(),
-      icon: Users,
-      iconColorClass: "text-green-500",
-    },
+    // {
+    //   title: "Unique Sessions",
+    //   value: analyticsData.uniqueSessions.toLocaleString(),
+    //   icon: Users,
+    //   iconColorClass: "text-green-500",
+    // },
     {
       title: "Conversion Rate",
       value: "N/A",
@@ -439,6 +686,35 @@ export default function KpiDashboardPage() {
     : getRegionalDataIsError
     ? getRegionalDataError
     : null
+
+  const regionalData = getRegionalData?.regions ?? (getRegionalData ? [] : [])
+
+  const uniqueCountries = useMemo(() => {
+    const countriesMap: { [key: string]: number } = {}
+    const isoToCountryNameMap: { [key: string]: string } = {
+      GB: "United Kingdom",
+      NG: "Nigeria",
+      US: "United States of America",
+      CA: "Canada",
+      AU: "Australia",
+      DE: "Germany",
+      FR: "France",
+      JP: "Japan",
+      CN: "China",
+      IN: "India",
+      BR: "Brazil",
+      RU: "Russia",
+    }
+
+    regionalData.forEach((item: any) => {
+      const countryName = isoToCountryNameMap[item.country] || item.country
+      countriesMap[countryName] =
+        (countriesMap[countryName] || 0) + item.event_count
+    })
+
+    const sortedCountries = Object.keys(countriesMap).sort()
+    return ["World View", ...sortedCountries]
+  }, [regionalData])
 
   const handleDeleteEvents = () => {
     console.log("Deleting all events...")
@@ -517,52 +793,6 @@ export default function KpiDashboardPage() {
             </div>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-4 items-center">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !startDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={startDate}
-                onSelect={setStartDate}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !endDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {endDate ? format(endDate, "PPP") : <span>End Date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={endDate}
-                onSelect={setEndDate}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
           <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -583,7 +813,7 @@ export default function KpiDashboardPage() {
                   <SelectValue placeholder="Select a page" />
                 </SelectTrigger>
                 <SelectContent>
-                  {analyticsData.uniquePagePaths.map((path) => (
+                  {analyticsDataI.uniquePagePaths.map((path: any) => (
                     <SelectItem key={path} value={path}>
                       {path}
                     </SelectItem>
@@ -595,6 +825,43 @@ export default function KpiDashboardPage() {
           {kpiData.map((kpi) => (
             <KpiCard key={kpi.title} {...kpi} />
           ))}
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Unique Users
+              </CardTitle>
+              <Users className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {selectedDay === "All Days"
+                  ? getUniqueSessionsData?.total_unique_users?.toLocaleString() ??
+                    "N/A"
+                  : analyticsDataI.usersPerDayChartData.find(
+                      (d: any) => d.day === selectedDay
+                    )?.users ?? 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Users active on{" "}
+                {selectedDay === "All Days"
+                  ? "all days"
+                  : new Date(selectedDay).toLocaleDateString()}
+              </p>
+              <Select value={selectedDay} onValueChange={setSelectedDay}>
+                <SelectTrigger className="w-[180px] mt-2">
+                  <SelectValue placeholder="Select a day" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All Days">All Days</SelectItem>
+                  {analyticsDataI.usersPerDayChartData.map((data: any) => (
+                    <SelectItem key={data.day} value={data.day}>
+                      {new Date(data.day).toLocaleDateString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
           <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
@@ -637,22 +904,147 @@ export default function KpiDashboardPage() {
       </div>
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg col-span-2">
-          <CardHeader>
-            <CardTitle className="font-headline flex items-center">
-              <TrendingUp className="mr-2 h-5 w-5 text-primary" /> Regional Data
-            </CardTitle>
-            <CardDescription>
-              Regional analytics data in a table format.
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center">
+              <CardTitle className="font-headline flex items-center">
+                <TrendingUp className="mr-2 h-5 w-5 text-primary" /> Regional
+                Data
+              </CardTitle>
+            </div>
+            <div className="flex gap-2">
+              <Select
+                value={selectedCountry}
+                onValueChange={setSelectedCountry}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select a Country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueCountries.map((country) => (
+                    <SelectItem key={country} value={country}>
+                      {country}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-[140px] justify-start text-left font-normal",
+                      !startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate
+                      ? format(
+                          new Date(
+                            typeof startDate === "string"
+                              ? startDate
+                              : startDate instanceof String
+                              ? startDate.toString()
+                              : startDate
+                          ),
+                          "PPP"
+                        )
+                      : "Start Date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={
+                      startDate
+                        ? new Date(
+                            typeof startDate === "string"
+                              ? startDate
+                              : startDate instanceof String
+                              ? startDate.toString()
+                              : startDate
+                          )
+                        : undefined
+                    }
+                    onSelect={(date) =>
+                      setStartDate(date ? format(date, "yyyy-MM-dd") : null)
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-[140px] justify-start text-left font-normal",
+                      !endDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate
+                      ? format(
+                          new Date(
+                            typeof endDate === "string"
+                              ? endDate
+                              : endDate instanceof String
+                              ? endDate.toString()
+                              : endDate
+                          ),
+                          "PPP"
+                        )
+                      : "End Date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={
+                      endDate
+                        ? new Date(
+                            typeof endDate === "string"
+                              ? endDate
+                              : endDate instanceof String
+                              ? endDate.toString()
+                              : endDate
+                          )
+                        : undefined
+                    }
+                    onSelect={(date) =>
+                      setEndDate(date ? format(date, "yyyy-MM-dd") : null)
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </CardHeader>
           <CardContent>
-            {getRegionalData ? (
-              <RegionalDataTable data={getRegionalData} />
-            ) : (
-              <p className="text-muted-foreground">
-                No regional data to display.
+            {getRegionalDataLoading && (
+              <p className="text-center text-muted-foreground">
+                Loading regional data...
               </p>
             )}
+            {getRegionalDataIsError && (
+              <p className="text-center text-red-500">
+                Error fetching regional data.
+              </p>
+            )}
+            {!getRegionalDataLoading &&
+              !getRegionalDataIsError &&
+              regionalData.length === 0 && (
+                <p className="text-center text-muted-foreground">
+                  No regional data found for the selected date range.
+                </p>
+              )}
+            {!getRegionalDataLoading &&
+              !getRegionalDataIsError &&
+              regionalData.length > 0 && (
+                <RegionalHeatmap
+                  data={regionalData}
+                  selectedCountry={selectedCountry}
+                />
+              )}
           </CardContent>
         </Card>
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
@@ -767,16 +1159,17 @@ export default function KpiDashboardPage() {
                   labelStyle={{ color: "hsl(var(--popover-foreground))" }}
                   itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                 />
+
                 <Line
                   type="monotone"
                   dataKey="clicks"
-                  stroke="hsl(var(--purple-500))"
-                  strokeWidth={3}
+                  stroke="purple"
+                  strokeWidth={6}
                   dot={{
                     r: 5,
                     fill: "purple",
                     strokeWidth: 2,
-                    stroke: "#fff",
+                    stroke: "red",
                   }}
                   activeDot={{ r: 7 }}
                 />

@@ -48,9 +48,16 @@ export const queryApi = createApi({
       },
     }),
     getRegionalData: builder.query({
-      query: ({ id }: any) => {
+      query: ({ id, start_date }: any) => {
         return {
-          url: `/analytics/regions/${id}?start_date=2025-01-01`,
+          url: `/analytics/regions/${id}?start_date=${start_date}`,
+        }
+      },
+    }),
+    getUniqueSessions: builder.query({
+      query: ({ id, start_date }: any) => {
+        return {
+          url: `/dashboard/analytics/unique-users`,
         }
       },
     }),
@@ -58,6 +65,7 @@ export const queryApi = createApi({
 })
 
 export const {
+  useGetUniqueSessionsQuery,
   useGetRegionalDataQuery,
   useCompanyWeb3EventsQuery,
   useGetClientCompaniesQuery,
