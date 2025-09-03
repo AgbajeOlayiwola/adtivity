@@ -815,12 +815,16 @@ export default function KpiDashboardPage() {
                 Views based on selected path
               </p>
               <Select value={selectedPage} onValueChange={setSelectedPage}>
-                <SelectTrigger className="w-[180px] mt-2">
+                <SelectTrigger className="cursor-target w-[180px] mt-2">
                   <SelectValue placeholder="Select a page" />
                 </SelectTrigger>
                 <SelectContent>
                   {analyticsData.uniquePagePaths.map((path: any) => (
-                    <SelectItem key={path} value={path}>
+                    <SelectItem
+                      key={path}
+                      className="cursor-target"
+                      value={path}
+                    >
                       {path}
                     </SelectItem>
                   ))}
@@ -854,13 +858,17 @@ export default function KpiDashboardPage() {
                   : new Date(selectedDay).toLocaleDateString()}
               </p>
               <Select value={selectedDay} onValueChange={setSelectedDay}>
-                <SelectTrigger className="w-[180px] mt-2">
+                <SelectTrigger className="cursor-target w-[180px] mt-2">
                   <SelectValue placeholder="Select a day" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="All Days">All Days</SelectItem>
                   {analyticsDataI.usersPerDayChartData.map((data: any) => (
-                    <SelectItem key={data.day} value={data.day}>
+                    <SelectItem
+                      key={data.day}
+                      className="cursor-target"
+                      value={data.day}
+                    >
                       {new Date(data.day).toLocaleDateString()}
                     </SelectItem>
                   ))}
@@ -883,7 +891,7 @@ export default function KpiDashboardPage() {
                 Clicks on the hero section
               </p>
               <Select value={selectedButton} onValueChange={setSelectedButton}>
-                <SelectTrigger className="w-[180px] mt-2">
+                <SelectTrigger className="cursor-target w-[180px] mt-2">
                   <SelectValue placeholder="Select a button" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1069,7 +1077,7 @@ export default function KpiDashboardPage() {
               </SelectTrigger>
               <SelectContent>
                 {analyticsData.uniquePagePaths.map((path) => (
-                  <SelectItem key={path} value={path}>
+                  <SelectItem key={path} className="cursor-target" value={path}>
                     {path}
                   </SelectItem>
                 ))}
@@ -1134,7 +1142,11 @@ export default function KpiDashboardPage() {
               </SelectTrigger>
               <SelectContent>
                 {analyticsData.uniqueButtonNames.map((buttonName) => (
-                  <SelectItem key={buttonName} value={buttonName}>
+                  <SelectItem
+                    key={buttonName}
+                    className="cursor-target"
+                    value={buttonName}
+                  >
                     {buttonName}
                   </SelectItem>
                 ))}
