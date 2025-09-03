@@ -783,13 +783,14 @@ export default function KpiDashboardPage() {
               <Button
                 variant="outline"
                 onClick={() => setShowRegenerateModal(true)}
-                className="text-purple-500 hover:text-purple-600 border-purple-500"
+                className="cursor-target text-purple-500 hover:text-purple-600 border-purple-500"
               >
                 <RefreshCcw className="h-4 w-4 mr-2" />
                 Regenerate
               </Button>
               <Button
                 variant="destructive"
+                className="cursor-target"
                 onClick={() => setShowDeleteModal(true)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -1063,7 +1064,7 @@ export default function KpiDashboardPage() {
               </CardDescription>
             </div>
             <Select value={selectedPage} onValueChange={setSelectedPage}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="cursor-target w-[180px]">
                 <SelectValue placeholder="Select a page" />
               </SelectTrigger>
               <SelectContent>
@@ -1128,7 +1129,7 @@ export default function KpiDashboardPage() {
               </CardDescription>
             </div>
             <Select value={selectedButton} onValueChange={setSelectedButton}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="cursor-target w-[180px]">
                 <SelectValue placeholder="Select a button" />
               </SelectTrigger>
               <SelectContent>
