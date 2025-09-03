@@ -896,7 +896,11 @@ export default function KpiDashboardPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {analyticsData.uniqueButtonNames.map((buttonName) => (
-                    <SelectItem key={buttonName} value={buttonName}>
+                    <SelectItem
+                      key={buttonName}
+                      className="cursor-target"
+                      value={buttonName}
+                    >
                       {buttonName}
                     </SelectItem>
                   ))}
