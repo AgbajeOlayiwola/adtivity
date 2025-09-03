@@ -231,7 +231,7 @@ export default function LoginPage() {
               />
               <Button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-full py-3 text-lg shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
+                className="cursor-target w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-full py-3 text-lg shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
               >
                 {_createPlatformUserLoad ? (
                   <MdLocalDining />
@@ -246,14 +246,17 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
-          <Link href="#" className="text-sm text-accent hover:underline">
+          <Link
+            href="#"
+            className="cursor-target text-sm text-accent hover:underline"
+          >
             Forgot password?
           </Link>
           <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link
               href="/login"
-              className="font-medium text-primary hover:underline"
+              className="cursor-target font-medium text-primary hover:underline"
             >
               Sign up
             </Link>

@@ -92,7 +92,7 @@ const Dashboard = () => {
           getClientCompaniesData?.map((item: any, index: number) => {
             return (
               <div
-                className="flex w-[30%] flex-col items-center gap-3 cursor-pointer group"
+                className="cursor-target flex w-[30%] flex-col items-center gap-3 cursor-pointer group"
                 key={index}
               >
                 <div
@@ -113,7 +113,7 @@ const Dashboard = () => {
           })
         )}
         <div
-          className="flex w-[30%] flex-col gap-3 cursor-pointer group"
+          className="cursor-target flex w-[30%] flex-col gap-3 cursor-pointer group"
           onClick={() => setModal((prev: boolean) => !prev)}
         >
           <div
@@ -158,7 +158,7 @@ const Dashboard = () => {
 
                   <Button
                     type="submit"
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-full py-3 text-lg shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
+                    className="cursor-target w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-full py-3 text-lg shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
                   >
                     {createClientCompanyLoad ? (
                       <LoaderIcon />
