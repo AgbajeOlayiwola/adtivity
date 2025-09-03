@@ -484,7 +484,7 @@ export default function KpiDashboardPage() {
         day: entry.day,
         users: entry.users,
       }))
-      setAnalyticsDataI((prev) => ({
+      setAnalyticsDataI((prev: any) => ({
         ...prev,
         uniqueSessions: getUniqueSessionsData.total_unique_users,
         usersPerDayChartData: usersByDay,
@@ -502,7 +502,7 @@ export default function KpiDashboardPage() {
         ...(Array.isArray(web3Events) ? web3Events : []),
       ]
       setRawEvents(combinedEvents)
-      const processedData = calculateDashboardMetrics(combinedEvents)
+      const processedData: any = calculateDashboardMetrics(combinedEvents)
       setAnalyticsData(processedData)
       setSelectedButton("All Clicks")
       setSelectedPage("All Pages")
@@ -687,7 +687,12 @@ export default function KpiDashboardPage() {
     ? getRegionalDataError
     : null
 
-  const regionalData = getRegionalData?.regions ?? (getRegionalData ? [] : [])
+  const regionalData: any[] =
+    getRegionalData &&
+    typeof getRegionalData === "object" &&
+    "regions" in getRegionalData
+      ? (getRegionalData.regions as any[])
+      : []
 
   const uniqueCountries = useMemo(() => {
     const countriesMap: { [key: string]: number } = {}

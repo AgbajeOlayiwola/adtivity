@@ -39,7 +39,11 @@ const Header = () => {
       </Link>
       {isAuthenticated ? (
         <Link href="/dashboard" className="block md:py-0">
-          <Button variant="default" size="sm" className="w-full md:w-auto">
+          <Button
+            variant="default"
+            size="sm"
+            className="cursor-target w-full md:w-auto"
+          >
             <User className="mr-2 h-4 w-4" />
             Dashboard
           </Button>
@@ -49,7 +53,7 @@ const Header = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="w-full md:w-auto text-accent hover:text-accent hover:bg-accent/10"
+            className="cursor-target w-full md:w-auto text-accent hover:text-accent hover:bg-accent/10"
           >
             <LogIn className="mr-2 h-4 w-4" />
             Login
@@ -59,7 +63,7 @@ const Header = () => {
       <Link href="/dashboard" className="block md:py-0">
         <Button
           variant="default"
-          className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
+          className="cursor-target w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
         >
           View Demo
         </Button>
@@ -68,12 +72,12 @@ const Header = () => {
   )
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 max-w-screen-2xl items-center justify-between">
+    <header className="absolute flex top-4 justify-center z-50 w-full  supports-[backdrop-filter]:bg-background/60">
+      <div className="container w-[80%] flex h-16 max-w-screen-2xl items-center justify-between rounded-lg backdrop-blur">
         <Logo />
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
+        <nav className="cursor-target hidden md:flex items-center space-x-6 text-sm font-medium">
           {navLinks}
         </nav>
 

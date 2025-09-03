@@ -1,3 +1,4 @@
+import TargetCursor from "@/components/targetcursor"
 import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/redux/provider"
 import type { Metadata } from "next"
@@ -30,6 +31,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased min-h-screen flex flex-col">
         <Providers>
+          <TargetCursor spinDuration={2} hideDefaultCursor={true} />
           {children}
           <Toaster />
         </Providers>

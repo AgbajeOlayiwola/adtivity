@@ -1,5 +1,5 @@
 "use client" // This directive is necessary for client-side components in Next.js 13+ App Router
-
+import Galaxy from "@/components/galaxy"
 import FeaturesSection from "@/components/landing/features-section"
 import HeroSection from "@/components/landing/hero-section"
 import Footer from "@/components/layout/footer"
@@ -14,8 +14,8 @@ const PricingSection = () => {
       id="pricing"
       className="py-20 md:py-28 bg-background relative overflow-hidden"
     >
-      <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-background to-transparent opacity-50 -z-0"></div>
-      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background to-transparent opacity-50 -z-0"></div>
+      {/* <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-background to-transparent opacity-50 -z-0"></div> */}
+      {/* <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background to-transparent opacity-50 -z-0"></div> */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-16">
           <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter mb-4">
@@ -49,7 +49,7 @@ const PricingSection = () => {
             </ul>
             <Button
               variant="outline"
-              className="mt-8 w-full border-primary text-primary hover:bg-primary/10"
+              className="cursor-target mt-8 w-full border-primary text-primary hover:bg-primary/10"
             >
               Choose Plan
             </Button>
@@ -78,7 +78,7 @@ const PricingSection = () => {
               <li>Custom Reports & Export</li>
               <li>Priority Support</li>
             </ul>
-            <Button className="mt-8 w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button className="cursor-target mt-8 w-full bg-primary hover:bg-primary/90 text-primary-foreground">
               Choose Plan
             </Button>
           </div>
@@ -102,7 +102,7 @@ const PricingSection = () => {
             </ul>
             <Button
               variant="outline"
-              className="mt-8 w-full border-accent text-accent hover:bg-accent/10"
+              className="cursor-target mt-8 w-full border-accent text-accent hover:bg-accent/10"
             >
               Contact Sales
             </Button>
@@ -127,7 +127,7 @@ const CTASection = () => {
         <Link href="/login">
           <Button
             size="lg"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-10 py-4 text-xl shadow-xl shadow-primary/40 transition-all duration-300 hover:shadow-primary/60 transform hover:scale-105"
+            className="cursor-target bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-10 py-4 text-xl shadow-xl shadow-primary/40 transition-all duration-300 hover:shadow-primary/60 transform hover:scale-105"
           >
             Start Your Free Trial Today
           </Button>
@@ -141,7 +141,17 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-grow">
+      <main>
+        <div style={{ width: "100%", height: "100vh", position: "fixed" }}>
+          <Galaxy
+            mouseRepulsion={true}
+            mouseInteraction={true}
+            density={1}
+            glowIntensity={0.2}
+            saturation={0.1}
+            hueShift={10}
+          />
+        </div>
         <HeroSection />
         <FeaturesSection />
         {/* Pass the adtivityInstance down to child components that need to manually track events */}
