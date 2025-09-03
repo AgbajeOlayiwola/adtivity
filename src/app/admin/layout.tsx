@@ -117,7 +117,10 @@ export default function DashboardLayout({
             <SidebarMenu>
               {secondaryNavLinks.map((link) => (
                 <SidebarMenuItem key={link.href}>
-                  <div onClick={link.label === "Logout" ? LogOut : settings}>
+                  <div
+                    className="cursor-target"
+                    onClick={link.label === "Logout" ? LogOut : settings}
+                  >
                     <SidebarMenuButton
                       isActive={
                         pathname.startsWith(link.href) && link.href !== "/"
@@ -190,23 +193,32 @@ export default function DashboardLayout({
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
-                    <Link href="/admin/profile" className="w-full">
+                    <Link
+                      href="/admin/profile"
+                      className="cursor-target w-full"
+                    >
                       Profile{" "}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Link href="/admin/billing" className="w-full">
+                    <Link
+                      href="/admin/billing"
+                      className="cursor-target w-full"
+                    >
                       Billing{" "}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Link href="/admin/settings" className="w-full">
+                    <Link
+                      href="/admin/settings"
+                      className="cursor-target w-full"
+                    >
                       Settings{" "}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
-                    <Link href="/" className="w-full">
+                    <Link href="/" className="cursor-target w-full">
                       Logout
                     </Link>
                   </DropdownMenuItem>
