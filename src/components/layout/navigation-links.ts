@@ -26,7 +26,7 @@ export const mainNavLinks: NavLink[] = [
       pathname === "/dashboard" || pathname === "/dashboard/kpi",
   },
   {
-    href: "/admin/anomalies",
+    href: "/admin/twitter-analytics",
     label: "Twitter Analytics (Coming Soon)",
     icon: TrendingUp,
     group: "Analytics",

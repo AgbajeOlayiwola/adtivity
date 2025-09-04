@@ -45,11 +45,35 @@ export const mutationApi = createApi({
         body,
       }),
     }),
+    validateTwitter: builder.mutation({
+      query: (body: any) => ({
+        url: "/twitter/users/validate",
+        method: "POST",
+        body,
+      }),
+    }),
+    twitterUsersSearch: builder.mutation({
+      query: (body: any) => ({
+        url: "/twitter/users/search",
+        method: "POST",
+        body,
+      }),
+    }),
+    createTwitterAccounts: builder.mutation({
+      query: (body: any) => ({
+        url: "/twitter/accounts/",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 })
 
 export const {
+  useCreateTwitterAccountsMutation,
+  useTwitterUsersSearchMutation,
   useCreatePlatformUsersMutation,
   usePlatformUserLoginMutation,
   useCreateClientCompanyMutation,
+  useValidateTwitterMutation,
 } = mutationApi

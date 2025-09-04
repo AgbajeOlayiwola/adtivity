@@ -61,11 +61,47 @@ export const queryApi = createApi({
         }
       },
     }),
+    //twitter
+    realTimeValidateTwitter: builder.query({
+      query: (body: any) => ({
+        url: "/twitter/users/quick-validate/{handle}",
+      }),
+    }),
+    autocompleteTwitterUser: builder.query({
+      query: ({ query }: any) => ({
+        url: `/twitter/users/autocomplete?query=${query}&max_results=3`,
+      }),
+    }),
+    twitterMentions: builder.query({
+      query: (body: any) => ({
+        url: "/twitter/mentions/recent",
+      }),
+    }),
+    twitterMentionsAnalytics: builder.query({
+      query: (body: any) => ({
+        url: "/twitter/accounts/{twitter_id}/mentions/analytics",
+      }),
+    }),
+    twitterFollowers: builder.query({
+      query: (body: any) => ({
+        url: "/twitter/accounts/{twitter_id}/followers",
+      }),
+    }),
+    tweetes: builder.query({
+      query: (body: any) => ({
+        url: "twitter/accounts/{twitter_id}/followers",
+      }),
+    }),
   }),
 })
 
 export const {
+  useTweetesQuery,
+  useTwitterFollowersQuery,
+  useTwitterMentionsQuery,
+  useAutocompleteTwitterUserQuery,
   useGetUniqueSessionsQuery,
+  useRealTimeValidateTwitterQuery,
   useGetRegionalDataQuery,
   useCompanyWeb3EventsQuery,
   useGetClientCompaniesQuery,
