@@ -1,9 +1,9 @@
 "use client" // This directive is necessary for client-side components in Next.js 13+ App Router
+import DotGrid from "@/components/dotgrid"
 import FeaturesSection from "@/components/landing/features-section"
 import HeroSection from "@/components/landing/hero-section"
 import Footer from "@/components/layout/footer"
 import Header from "@/components/layout/header"
-import Particles from "@/components/particles"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
@@ -143,15 +143,16 @@ export default function Home() {
       <Header />
       <main>
         <div style={{ width: "100%", height: "100vh", position: "fixed" }}>
-          <Particles
-            particleColors={["#ffffff", "#ffffff"]}
-            particleCount={200}
-            particleSpread={10}
-            speed={0.1}
-            particleBaseSize={100}
-            moveParticlesOnHover={true}
-            alphaParticles={false}
-            disableRotation={false}
+          <DotGrid
+            dotSize={5}
+            gap={7}
+            baseColor="#231b31"
+            activeColor="#5227FF"
+            proximity={100}
+            shockRadius={60}
+            shockStrength={15}
+            resistance={750}
+            returnDuration={0.5}
           />
         </div>
         <HeroSection />
