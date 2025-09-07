@@ -84,7 +84,7 @@ const Dashboard = () => {
         Number of companies registered{" "}
         {profile?.payload?.client_companies?.length || 0}
       </p>
-      <br />
+      <br />{" "}
       <div className="flex gap-5 flex-wrap w-[100%]">
         {getClientCompaniesLoad ? (
           <p>Loading.....</p>
@@ -123,7 +123,7 @@ const Dashboard = () => {
             <FaPlus className="text-[40px] transition-all duration-300 ease-in-out group-hover:scale-110" />
           </div>
           <p className="transition-all duration-300 ease-in-out group-hover:font-medium">
-            Create a company
+            Create a campaign
           </p>
         </div>
         {modal ? (
@@ -163,7 +163,7 @@ const Dashboard = () => {
                     {createClientCompanyLoad ? (
                       <LoaderIcon />
                     ) : (
-                      "Create Company "
+                      "Create Campaign "
                     )}
                   </Button>
                 </form>

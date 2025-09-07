@@ -23,6 +23,7 @@ import progileReducer from "../slices/profileSlice"
 import apikeyReducer from "../slices/qpikey"
 import tokenReducer from "../slices/userTokenSlice"
 import yearlyTargetReducer from "../slices/yearlyTargetSlice"
+import twitterItemsReducer from "../slices/twitterItems"
 const reducers = combineReducers({
   [mutationApi.reducerPath]: mutationApi.reducer,
   [queryApi.reducerPath]: queryApi.reducer,
@@ -34,6 +35,7 @@ const reducers = combineReducers({
   merchantCount: merchantCountReducer,
   documents: documentReducer,
   apikey: apikeyReducer,
+  twitterItems: twitterItemsReducer,
 })
 
 const persistConfig = {
@@ -49,6 +51,7 @@ const persistConfig = {
     "documents",
     "apikeyReducer",
     "apikey",
+    "twitterItems",
   ],
 }
 
