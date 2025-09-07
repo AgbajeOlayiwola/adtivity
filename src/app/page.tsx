@@ -1,9 +1,9 @@
 "use client" // This directive is necessary for client-side components in Next.js 13+ App Router
-import Galaxy from "@/components/galaxy"
 import FeaturesSection from "@/components/landing/features-section"
 import HeroSection from "@/components/landing/hero-section"
 import Footer from "@/components/layout/footer"
 import Header from "@/components/layout/header"
+import Particles from "@/components/particles"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
@@ -143,13 +143,15 @@ export default function Home() {
       <Header />
       <main>
         <div style={{ width: "100%", height: "100vh", position: "fixed" }}>
-          <Galaxy
-            mouseRepulsion={true}
-            mouseInteraction={true}
-            density={1}
-            glowIntensity={0.2}
-            saturation={0.1}
-            hueShift={10}
+          <Particles
+            particleColors={["#ffffff", "#ffffff"]}
+            particleCount={200}
+            particleSpread={10}
+            speed={0.1}
+            particleBaseSize={100}
+            moveParticlesOnHover={true}
+            alphaParticles={false}
+            disableRotation={false}
           />
         </div>
         <HeroSection />

@@ -31,7 +31,10 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { useUseInfoQuery } from "@/redux/api/queryApi"
+import { clearDocuments } from "@/redux/slices/documents"
 import { clearProfile, setProfile } from "@/redux/slices/profileSlice"
+import { clearApikey } from "@/redux/slices/qpikey"
+import { clearTwitterItems } from "@/redux/slices/twitterItems"
 import { clearToken } from "@/redux/slices/userTokenSlice"
 import { Bell, ChevronDown, Search } from "lucide-react"
 import Link from "next/link"
@@ -52,6 +55,9 @@ export default function DashboardLayout({
   const LogOut = async () => {
     await dispatch(clearToken())
     await dispatch(clearProfile())
+    await dispatch(clearDocuments())
+    await dispatch(clearApikey())
+    await dispatch(clearTwitterItems())
     window.location.href = "/login"
   }
   const {
