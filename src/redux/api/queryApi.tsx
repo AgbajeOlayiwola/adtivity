@@ -79,7 +79,7 @@ export const queryApi = createApi({
     }),
     twitterMentionsAnalytics: builder.query({
       query: (body: any) => ({
-        url: `/twitter/accounts/${body?.twitterId}/mentions/analytics?start_date=2025-08-01&end_date=2025-09-01`,
+        url: `/twitter/accounts/${body?.twitterId}/mentions/analytics?start_date=2025-08-01&end_date=2025-09-10`,
       }),
     }),
     twitterFollowers: builder.query({

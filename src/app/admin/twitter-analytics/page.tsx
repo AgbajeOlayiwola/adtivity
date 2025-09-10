@@ -72,12 +72,14 @@ const TwitterAnalytics = () => {
     createdTweeterRefetch()
   }
 
-  const { twitterItems }: any = useSelector((store) => store)
+  const { profile }: any = useSelector((store) => store)
   const {
     data: analyticsData,
     isLoading: analyticsLoad,
     isSuccess: analyticsSuccess,
-  }: any = useTwitterMentionsAnalyticsQuery({ twitterId: twitterItems?.id })
+  }: any = useTwitterMentionsAnalyticsQuery({
+    twitterId: profile?.twitter_profiles[0]?.id,
+  })
 
   const hasTwitterIntegration =
     createdTweeterData?.has_twitter_integration === true
@@ -97,7 +99,7 @@ const TwitterAnalytics = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          twitterId: twitterItems?.id,
+          twitterId: profile?.twitter_profiles[0]?.id,
           tone,
           count,
           analytics: analyticsData, // ← send your server response directly

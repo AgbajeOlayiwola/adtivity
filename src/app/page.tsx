@@ -142,7 +142,14 @@ export default function Home() {
     <div className="flex flex-col min-h-screen">
       <Header />
       <main>
-        <div style={{ width: "100%", height: "100vh", position: "fixed" }}>
+        <div
+          style={{
+            width: "100%",
+            height: "100vh",
+            position: "fixed",
+            zIndex: "10",
+          }}
+        >
           <DotGrid
             dotSize={5}
             gap={10}
