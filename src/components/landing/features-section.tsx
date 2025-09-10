@@ -402,7 +402,7 @@ const FeaturesSection = () => {
   }, [])
 
   return (
-    <section id="features" className="py-20 md:py-28 z-40">
+    <section id="features" className="py-20 md:py-28 z-100">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10 md:mb-14">
           <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter mb-4">

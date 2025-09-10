@@ -50,6 +50,7 @@ type TweetIdea = {
 
 const TwitterAnalytics = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const { profile }: any = useSelector((store) => store)
   const [tweetIdeas, setTweetIdeas] = useState<TweetIdea[]>([])
   const [count, setCount] = useState(5)
   const [tone, setTone] = useState(
@@ -71,14 +72,12 @@ const TwitterAnalytics = () => {
     setIsModalOpen(false)
     createdTweeterRefetch()
   }
-
-  const { profile }: any = useSelector((store) => store)
   const {
     data: analyticsData,
     isLoading: analyticsLoad,
     isSuccess: analyticsSuccess,
   }: any = useTwitterMentionsAnalyticsQuery({
-    twitterId: profile?.twitter_profiles[0]?.id,
+    twitterId: profile?.twitter_profiles[0]?.id ?? 0,
   })
 
   const hasTwitterIntegration =

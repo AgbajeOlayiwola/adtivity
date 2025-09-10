@@ -146,8 +146,8 @@ export default function Home() {
           style={{
             width: "100%",
             height: "100vh",
-            position: "fixed",
-            zIndex: "10",
+            position: "absolute",
+            zIndex: 1,
           }}
         >
           <DotGrid
