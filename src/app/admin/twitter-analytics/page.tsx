@@ -77,7 +77,7 @@ const TwitterAnalytics = () => {
     isLoading: analyticsLoad,
     isSuccess: analyticsSuccess,
   }: any = useTwitterMentionsAnalyticsQuery({
-    twitterId: profile?.twitter_profiles[0]?.id ?? 0,
+    twitterId: profile?.twitter_profiles[0]?.id,
   })
 
   const hasTwitterIntegration =
