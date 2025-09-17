@@ -72,12 +72,16 @@ const TwitterAnalytics = () => {
     setIsModalOpen(false)
     createdTweeterRefetch()
   }
+  const twitterId = profile?.twitter_profiles?.[0]?.id
+
+  // 2) Don't fire the query until we actually have an id
   const {
     data: analyticsData,
     isLoading: analyticsLoad,
     isSuccess: analyticsSuccess,
-  }: any = useTwitterMentionsAnalyticsQuery({
-    twitterId: profile?.twitter_profiles[0]?.id,
+  }: any = useTwitterMentionsAnalyticsQuery(twitterId!, {
+    // RTK Query "skip" option – prevents the hook from running until truthy
+    skip: !twitterId,
   })
 
   const hasTwitterIntegration =
@@ -92,16 +96,21 @@ const TwitterAnalytics = () => {
   )
 
   const handleGenerate = async () => {
+    if (!twitterId) {
+      console.warn("No twitterId yet; aborting generate.")
+      return
+    }
+
     setIsGenerating(true)
     try {
       const res = await fetch("/api/generate-buzz-tweets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          twitterId: profile?.twitter_profiles[0]?.id,
+          twitterId, // safe now
           tone,
           count,
-          analytics: analyticsData, // ← send your server response directly
+          analytics: analyticsData, // may be undefined if not loaded yet (OK if your API handles it)
         }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
