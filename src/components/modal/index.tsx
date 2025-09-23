@@ -6,12 +6,13 @@ import { X } from "lucide-react"
 import React, { useEffect, useRef } from "react"
 
 interface ModalProps {
+  isOpen: boolean
   open: boolean
   onClose: () => void
   children: React.ReactNode
 }
 
-const Modal = ({ open, onClose, children }: ModalProps) => {
+const Modal = ({ isOpen, open, onClose, children }: any) => {
   const modalRef = useRef<HTMLDivElement>(null)
 
   // Close modal when pressing the Escape key

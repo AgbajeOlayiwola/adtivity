@@ -1,6 +1,7 @@
 "use client"
 
 import KpiCard from "@/components/dashboard/kpi-card"
+import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
@@ -12,6 +13,7 @@ import { ChartContainer } from "@/components/ui/chart"
 import {
   Eye,
   FilePlus2,
+  Hash,
   RefreshCcw,
   Repeat,
   Target,
@@ -19,7 +21,6 @@ import {
   TrendingUp,
   Users,
   Wallet,
-  X,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useSelector } from "react-redux"
@@ -49,27 +50,20 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { format } from "date-fns"
+import { format, formatDistanceToNow } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 
+import RegionalHeatmap from "@/components/compnay-info/heatMap"
+import { WalletActivityModal } from "@/components/compnay-info/wallet/activity"
+import WalletModal from "@/components/compnay-info/wallet/add-wallet"
+import { Modal } from "@/components/modal"
 import {
   useCompanyDataQuery,
   useCompanyWeb3EventsQuery,
+  useConnectedWalletsQuery,
   useGetRegionalDataQuery,
   useGetUniqueSessionsQuery,
 } from "@/redux/api/queryApi"
-import { scaleSequential } from "d3-scale"
-import { interpolateReds } from "d3-scale-chromatic"
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  Sphere,
-  ZoomableGroup,
-} from "react-simple-maps"
-import { Tooltip } from "react-tooltip"
-
-const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"
 
 const chartConfig = {
   sales: { label: "Sales", color: "hsl(var(--chart-1))" },
@@ -78,338 +72,97 @@ const chartConfig = {
   clicks: { label: "Clicks", color: "hsl(var(--purple-500))" },
 }
 
-const calculateDashboardMetrics = (events: any) => {
-  const sessions = new Set()
-  const heroClicks = events.filter(
-    (event: any) =>
-      event.event_name.startsWith("Hero:") ||
-      event.event_name.startsWith("Button:")
-  )
-  const uniqueButtonNames = [
-    "All Clicks",
-    ...new Set(heroClicks.map((event: any) => event.event_name)),
-  ]
+// ------------------------------------------------------------
+// Helper types & utils
+// ------------------------------------------------------------
 
-  const pageEvents = events.filter(
-    (event: any) =>
-      event.event_name === "Page Viewed" || event.event_name === "Page Loaded"
-  )
-
-  const uniquePageEventNames = [
-    "All Page Events",
-    ...new Set(pageEvents.map((event: any) => event.event_name)),
-  ]
-
-  const uniquePagePaths = [
-    "All Pages",
-    ...new Set(pageEvents.map((event: any) => event.properties?.path)),
-  ]
-
-  events.forEach((event: any) => {
-    if (event.properties?.sessionId) {
-      sessions.add(event.properties.sessionId)
-    }
-  })
-
-  return {
-    heroClicks,
-    uniqueSessions: sessions.size,
-    uniqueButtonNames,
-    uniquePagePaths,
-    uniquePageEventNames,
-  }
+type WalletConn = {
+  wallet_address: string
+  wallet_type: string
+  network: string
+  wallet_name: string
+  id: string
+  company_id: string
+  is_active: boolean
+  is_verified: boolean
+  verification_method: string | null
+  verification_timestamp: string | null
+  created_at: string
+  last_activity: string | null
 }
 
-const Modal = ({
-  isOpen,
-  title,
-  message,
-  onConfirm,
-  onCancel,
-  confirmText = "Confirm",
-}: any) => {
-  if (!isOpen) return null
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <Card className="w-full max-w-sm p-6 bg-card/95 backdrop-blur-sm shadow-xl relative">
-        <button
-          onClick={onCancel}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-        </button>
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold">{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">{message}</p>
-          <div className="mt-6 flex justify-end space-x-2">
-            <Button variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={onConfirm}>
-              {confirmText}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
+type Txn = {
+  transaction_hash: string
+  block_number: number
+  transaction_type: string
+  from_address: string
+  to_address: string
+  token_address: string
+  token_symbol: string
+  token_name: string
+  amount: string
+  amount_usd: string
+  gas_used: number
+  gas_price: string
+  gas_fee_usd: string
+  network: string
+  status: "confirmed" | "failed" | string
+  timestamp: string
+  transaction_metadata: Record<string, any>
+  id: string
+  wallet_connection_id: string
+  created_at: string
 }
 
-const RegionalHeatmap = ({
-  data,
-  selectedCountry,
-}: {
-  data: any
-  selectedCountry: string
-}) => {
-  const [tooltipContent, setTooltipContent] = useState("")
-  const [geos, setGeos] = useState<any>(null)
-  const [hoveredCountry, setHoveredCountry] = useState<string | null>(null)
+type WalletAnalytics = {
+  wallet_address: string
+  total_transactions: number
+  total_volume_usd: string
+  unique_tokens: number
+  networks: string[]
+  transaction_types: Record<string, number>
+  daily_activity: any[]
+  top_tokens: any[]
+  gas_spent_usd: string
+  first_transaction: string
+  last_transaction: string
+}
 
-  useEffect(() => {
-    fetch(geoUrl)
-      .then((response) => response.json())
-      .then((data) => {
-        setGeos(data.objects.countries.geometries)
-      })
-      .catch((error) => console.error("Error fetching geo data:", error))
-  }, [])
+const truncate = (v: string, left = 6, right = 4) =>
+  v && v.length > left + right ? `${v.slice(0, left)}…${v.slice(-right)}` : v
 
-  const isoToCountryNameMap: { [key: string]: string } = {
-    GB: "United Kingdom",
-    NG: "Nigeria",
-    US: "United States of America",
-    CA: "Canada",
-    AU: "Australia",
-    DE: "Germany",
-    FR: "France",
-    JP: "Japan",
-    CN: "China",
-    IN: "India",
-    BR: "Brazil",
-    RU: "Russia",
-  }
-
-  const countryDataMap = useMemo(() => {
-    type CityData = number
-    type RegionData = {
-      totalEvents: number
-      cities: { [city: string]: CityData }
-    }
-    type CountryData = {
-      totalEvents: number
-      regions: { [region: string]: RegionData }
-    }
-    const aggregatedData: { [country: string]: CountryData } = {}
-    data.forEach((item: any) => {
-      const countryName = isoToCountryNameMap[item.country] || item.country
-      if (countryName && item.region && item.city) {
-        if (!aggregatedData[countryName]) {
-          aggregatedData[countryName] = { totalEvents: 0, regions: {} }
-        }
-        if (!aggregatedData[countryName].regions[item.region]) {
-          aggregatedData[countryName].regions[item.region] = {
-            totalEvents: 0,
-            cities: {},
-          }
-        }
-        if (
-          !aggregatedData[countryName].regions[item.region].cities[item.city]
-        ) {
-          aggregatedData[countryName].regions[item.region].cities[item.city] = 0
-        }
-        aggregatedData[countryName].totalEvents += item.event_count
-        aggregatedData[countryName].regions[item.region].totalEvents +=
-          item.event_count
-        aggregatedData[countryName].regions[item.region].cities[item.city] +=
-          item.event_count
-      }
-    })
-    return aggregatedData
-  }, [data, isoToCountryNameMap])
-  // const countryDataMap = useMemo(() => {
-  //   const aggregatedData: { [key: string]: any } = {}
-  //   data.forEach((item: any) => {
-  //     const countryName = isoToCountryNameMap[item.country] || item.country
-  //     if (countryName) {
-  //       if (!aggregatedData[countryName]) {
-  //         aggregatedData[countryName] = {
-  //           country: countryName,
-  //           totalEvents: 0,
-  //           regionalDetails: {},
-  //         }
-  //       }
-  //       aggregatedData[countryName].totalEvents += item.event_count
-  //       if (
-  //         item.region &&
-  //         !aggregatedData[countryName].regionalDetails[item.region]
-  //       ) {
-  //         aggregatedData[countryName].regionalDetails[item.region] = 0
-  //       }
-  //       if (item.region) {
-  //         aggregatedData[countryName].regionalDetails[item.region] +=
-  //           item.event_count
-  //       }
-  //     }
-  //   })
-  //   return aggregatedData
-  // }, [data, isoToCountryNameMap])
-
-  const colorScale = useMemo(() => {
-    const maxEvents = Math.max(
-      ...Object.values(countryDataMap).map((d: any) => d.totalEvents),
-      0
-    )
-    return scaleSequential(interpolateReds).domain([0, maxEvents])
-  }, [countryDataMap])
-
-  const handleCountryHover = (countryName: string) => {
-    setHoveredCountry(countryName)
-  }
-
-  const handleCountryLeave = () => {
-    setHoveredCountry(null)
-  }
-
-  if (!geos) {
-    return <p className="text-center text-muted-foreground">Loading map...</p>
-  }
-
-  return (
-    <div className="relative w-full h-[500px] overflow-hidden rounded-lg">
-      <ComposableMap
-        height={500}
-        projection="geoMercator"
-        data-tooltip-id="country-tooltip"
-      >
-        <Sphere stroke="#E4E5E6" strokeWidth={0.5} id={""} fill={""} />
-        <ZoomableGroup center={[0, 0]} zoom={1}>
-          <Geographies geography={geoUrl}>
-            {({ geographies }) => (
-              <>
-                {geographies.map((geo) => {
-                  const countryName = geo.properties.name
-                  const countryMetrics = countryDataMap[countryName]
-                  return (
-                    <Geography
-                      key={geo.rsmKey}
-                      geography={geo}
-                      onMouseEnter={() => {
-                        handleCountryHover(countryName)
-                        if (countryMetrics) {
-                          setTooltipContent(
-                            `${countryName}: ${countryMetrics.totalEvents} Events`
-                          )
-                        } else {
-                          setTooltipContent(`${countryName}: No Data`)
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        handleCountryLeave()
-                        setTooltipContent("")
-                      }}
-                      style={{
-                        default: {
-                          fill: countryMetrics
-                            ? colorScale(countryMetrics.totalEvents)
-                            : "#DEDEDE",
-                          stroke: "#FFFFFF",
-                          strokeWidth: 0.5,
-                          outline: "none",
-                        },
-                        hover: {
-                          fill: countryMetrics
-                            ? colorScale(countryMetrics.totalEvents)
-                            : "#DEDEDE",
-                          stroke: "#2C2C2C",
-                          strokeWidth: 0.75,
-                          outline: "none",
-                        },
-                        pressed: {
-                          fill: countryMetrics
-                            ? colorScale(countryMetrics.totalEvents)
-                            : "#DEDEDE",
-                          stroke: "#2C2C2C",
-                          strokeWidth: 0.75,
-                          outline: "none",
-                        },
-                      }}
-                    />
-                  )
-                })}
-              </>
-            )}
-          </Geographies>
-        </ZoomableGroup>
-      </ComposableMap>
-      <Tooltip id="country-tooltip" content={tooltipContent} />
-      <div className="absolute top-4 left-4 z-10 w-[250px]">
-        <Card className="bg-card/95 backdrop-blur-sm shadow-xl">
-          <CardHeader>
-            <CardTitle>{hoveredCountry}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Total Events:{" "}
-              {hoveredCountry && countryDataMap[hoveredCountry]?.totalEvents
-                ? countryDataMap[hoveredCountry]?.totalEvents
-                : "N/A"}
-            </p>
-            <div className="mt-2">
-              {hoveredCountry &&
-                Object.entries(
-                  countryDataMap[hoveredCountry]?.regions || {}
-                ).map(([region, regionData]) => (
-                  <div key={region} className="mb-2">
-                    <p className="text-sm font-semibold text-muted-foreground">
-                      {region}: {regionData.totalEvents} Events
-                    </p>
-                    <ul className="pl-4">
-                      {Object.entries(regionData.cities || {}).map(
-                        ([city, count]) => (
-                          <li
-                            key={city}
-                            className="text-xs text-muted-foreground list-disc"
-                          >
-                            {city}: {count} Events
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
+const networkBadgeColor: Record<string, string> = {
+  ethereum: "bg-purple-500/10 text-purple-500",
+  polygon: "bg-fuchsia-500/10 text-fuchsia-500",
+  solana: "bg-emerald-500/10 text-emerald-500",
+  bsc: "bg-yellow-500/10 text-yellow-500",
+  arbitrum: "bg-sky-500/10 text-sky-500",
+  base: "bg-blue-500/10 text-blue-500",
+  optimism: "bg-rose-500/10 text-rose-500",
 }
 
 export default function KpiDashboardPage() {
-  const [rawEvents, setRawEvents] = useState<any>([])
+  const [rawEvents, setRawEvents] = useState<any[]>([])
   const [analyticsData, setAnalyticsData] = useState({
     uniqueSessions: 0,
-    uniqueButtonNames: [],
-    uniquePagePaths: [],
-    uniquePageEventNames: [],
+    uniqueButtonNames: [] as string[],
+    uniquePagePaths: [] as string[],
+    uniquePageEventNames: [] as string[],
   })
   const [selectedButton, setSelectedButton] = useState("All Clicks")
   const [selectedPage, setSelectedPage] = useState("All Pages")
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showWeb3Modal, setShowWeb3odal] = useState(false)
   const [showRegenerateModal, setShowRegenerateModal] = useState(false)
+  const [isWeb3Added, setIsWeb3Added] = useState(false)
 
-  const [startDate, setStartDate] = useState<Date | String | null>("2025-01-01")
-  const [endDate, setEndDate] = useState<Date | String | null>(null)
+  const [startDate, setStartDate] = useState<Date | string | null>("2025-01-01")
+  const [endDate, setEndDate] = useState<Date | string | null>(null)
 
   const [selectedCountry, setSelectedCountry] = useState("World View")
 
-  const { documents }: any = useSelector((store) => store)
-  const { apikey }: any = useSelector((store) => store)
-  const [salesData, setSalesData] = useState([
+  const { documents, apikey, token }: any = useSelector((store) => store)
+  const [salesData] = useState([
     { month: "Jan", sales: 1500, revenue: 35000 },
     { month: "Feb", sales: 1800, revenue: 42000 },
     { month: "Mar", sales: 1650, revenue: 38000 },
@@ -445,6 +198,16 @@ export default function KpiDashboardPage() {
     start_date: startDate,
     endDate,
   })
+
+  const {
+    data: connectedWalletsData,
+    refetch: refetchConnectedWallets,
+    isLoading: connectedWalletsDataLoading,
+    isSuccess: connectedWalletsDataSuccess,
+    isError: connectedWalletsDataIsError,
+    error: connectedWalletsDataError,
+  } = useConnectedWalletsQuery({ id: documents?.id, isActive: true })
+
   const {
     data: getUniqueSessionsData = { users_per_day: [], total_unique_users: 0 },
     isLoading: getUniqueSessionsLoading,
@@ -465,21 +228,61 @@ export default function KpiDashboardPage() {
     isError: boolean
     error: any
   }
-  // Inside your KpiDashboardPage component
+
   const [analyticsDataI, setAnalyticsDataI] = useState<any>({
     uniqueSessions: 0,
     uniqueButtonNames: [],
     uniquePagePaths: [],
     uniquePageEventNames: [],
-    usersPerDayChartData: [], // Add a state for daily user data
+    usersPerDayChartData: [],
   })
 
-  const [selectedDay, setSelectedDay] = useState("All Days") // New state for the selected day
+  const [selectedDay, setSelectedDay] = useState("All Days")
 
-  // Use a new useEffect to process the data from the endpoint
+  const calculateDashboardMetrics = (events: any[]) => {
+    const sessions = new Set<string>()
+    const heroClicks = events.filter(
+      (event: any) =>
+        event.event_name.startsWith("Hero:") ||
+        event.event_name.startsWith("Button:")
+    )
+    const uniqueButtonNames = [
+      "All Clicks",
+      ...new Set(heroClicks.map((event: any) => event.event_name)),
+    ]
+
+    const pageEvents = events.filter(
+      (event: any) =>
+        event.event_name === "Page Viewed" || event.event_name === "Page Loaded"
+    )
+
+    const uniquePageEventNames = [
+      "All Page Events",
+      ...new Set(pageEvents.map((event: any) => event.event_name)),
+    ]
+
+    const uniquePagePaths = [
+      "All Pages",
+      ...new Set(pageEvents.map((event: any) => event.properties?.path)),
+    ]
+
+    events.forEach((event: any) => {
+      if (event.properties?.sessionId) {
+        sessions.add(event.properties.sessionId)
+      }
+    })
+
+    return {
+      heroClicks,
+      uniqueSessions: sessions.size,
+      uniqueButtonNames,
+      uniquePagePaths,
+      uniquePageEventNames,
+    }
+  }
+
   useEffect(() => {
     if (getUniqueSessionsSuccess && getUniqueSessionsData) {
-      // Process data for the chart or daily breakdown
       const usersByDay = getUniqueSessionsData.users_per_day.map((entry) => ({
         day: entry.day,
         users: entry.users,
@@ -492,7 +295,6 @@ export default function KpiDashboardPage() {
     }
   }, [getUniqueSessionsSuccess, getUniqueSessionsData])
 
-  // ... rest of your component
   const web3Events = Array.isArray(web3EventsRaw) ? web3EventsRaw : []
 
   useEffect(() => {
@@ -546,7 +348,7 @@ export default function KpiDashboardPage() {
   }, [rawEvents, selectedPage])
 
   const pageViewsChartData = useMemo(() => {
-    if (!rawEvents.length) return []
+    if (!rawEvents.length) return [] as any[]
     const dailyPageViews = rawEvents
       .filter(
         (event: any) =>
@@ -570,7 +372,7 @@ export default function KpiDashboardPage() {
   }, [rawEvents, selectedPage])
 
   const clicksChartData = useMemo(() => {
-    if (!rawEvents.length) return []
+    if (!rawEvents.length) return [] as any[]
     const dailyClicks = rawEvents
       .filter(
         (event: any) =>
@@ -594,7 +396,7 @@ export default function KpiDashboardPage() {
   }, [rawEvents, selectedButton])
 
   const web3Kpis = useMemo(() => {
-    if (!web3Events || web3Events.length === 0) {
+    if (!Array.isArray(web3Events) || web3Events.length === 0) {
       return {
         totalTokenTransfers: 0,
         activeWallets: 0,
@@ -603,23 +405,21 @@ export default function KpiDashboardPage() {
       }
     }
     const tokenTransfers = web3Events.filter(
-      (event) => event.event_name === "Token Transferred"
+      (event: any) => event.event_name === "Token Transferred"
     )
     const uniqueWallets = new Set(
-      tokenTransfers.map((event) => event.properties?.wallet_address)
+      tokenTransfers.map((event: any) => event.properties?.wallet_address)
     )
     const now = new Date()
     const oneDayAgo = now.getTime() - 24 * 60 * 60 * 1000
     let totalVolume = 0
     let tokenSymbol = ""
 
-    tokenTransfers.forEach((event) => {
+    tokenTransfers.forEach((event: any) => {
       const eventTimestamp = new Date(event.timestamp).getTime()
       if (eventTimestamp > oneDayAgo) {
         totalVolume += event.properties?.amount || 0
-        if (!tokenSymbol) {
-          tokenSymbol = event.properties?.token_symbol || ""
-        }
+        if (!tokenSymbol) tokenSymbol = event.properties?.token_symbol || ""
       }
     })
     return {
@@ -631,12 +431,6 @@ export default function KpiDashboardPage() {
   }, [web3Events])
 
   const kpiData = [
-    // {
-    //   title: "Unique Sessions",
-    //   value: analyticsData.uniqueSessions.toLocaleString(),
-    //   icon: Users,
-    //   iconColorClass: "text-green-500",
-    // },
     {
       title: "Conversion Rate",
       value: "N/A",
@@ -731,6 +525,87 @@ export default function KpiDashboardPage() {
     setShowRegenerateModal(false)
   }
 
+  // -------------------------------------------
+  // Wallets grid + modal state
+  // -------------------------------------------
+  const [walletModalOpen, setWalletModalOpen] = useState(false)
+  const [selectedWallet, setSelectedWallet] = useState<WalletConn | null>(null)
+
+  const openWalletModal = (wallet: WalletConn) => {
+    setSelectedWallet(wallet)
+    setWalletModalOpen(true)
+  }
+
+  // Mock adapters for the three datasets you provided
+  const buildSampleAnalytics = (
+    wallet: WalletConn | null
+  ): WalletAnalytics | null => {
+    if (!wallet) return null
+    return {
+      wallet_address: wallet.wallet_address,
+      total_transactions: 12,
+      total_volume_usd: "14823.19",
+      unique_tokens: 5,
+      networks: [wallet.network],
+      transaction_types: { transfer: 9, swap: 2, approve: 1 },
+      daily_activity: [],
+      top_tokens: [],
+      gas_spent_usd: "42.17",
+      first_transaction: "2025-09-20T10:39:19.204Z",
+      last_transaction: "2025-09-22T02:39:19.204Z",
+    }
+  }
+
+  const sampleRecentTransactions: Txn[] = [
+    {
+      transaction_hash: "0xabc123…",
+      block_number: 1,
+      transaction_type: "transfer",
+      from_address: "0xFrom…",
+      to_address: "0xTo…",
+      token_address: "0xToken…",
+      token_symbol: "USDC",
+      token_name: "USD Coin",
+      amount: "250.00",
+      amount_usd: "250.00",
+      gas_used: 42000,
+      gas_price: "12 gwei",
+      gas_fee_usd: "0.45",
+      network: "ethereum",
+      status: "confirmed",
+      timestamp: "2025-09-22T02:37:28.567Z",
+      transaction_metadata: {},
+      id: "tx_1",
+      wallet_connection_id: "",
+      created_at: "2025-09-22T02:37:28.567Z",
+    },
+  ]
+
+  const sampleAllActivities: Txn[] = [
+    {
+      transaction_hash: "0xdef456…",
+      block_number: 2,
+      transaction_type: "swap",
+      from_address: "0xFrom…",
+      to_address: "0xTo…",
+      token_address: "0xToken…",
+      token_symbol: "SOL",
+      token_name: "Solana",
+      amount: "1.2",
+      amount_usd: "225.60",
+      gas_used: 5000,
+      gas_price: "n/a",
+      gas_fee_usd: "0.01",
+      network: "solana",
+      status: "confirmed",
+      timestamp: "2025-09-22T02:38:53.203Z",
+      transaction_metadata: {},
+      id: "tx_2",
+      wallet_connection_id: "",
+      created_at: "2025-09-22T02:38:53.203Z",
+    },
+  ]
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -754,6 +629,7 @@ export default function KpiDashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Confirm modals */}
       <Modal
         isOpen={showDeleteModal}
         title="Confirm Deletion"
@@ -770,6 +646,7 @@ export default function KpiDashboardPage() {
         onCancel={() => setShowRegenerateModal(false)}
         confirmText="Regenerate"
       />
+
       <div>
         <h1 className="text-3xl font-headline font-semibold tracking-tight">
           Business Overview
@@ -799,6 +676,7 @@ export default function KpiDashboardPage() {
             </div>
           </div>
         </div>
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
           <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -832,9 +710,11 @@ export default function KpiDashboardPage() {
               </Select>
             </CardContent>
           </Card>
+
           {kpiData.map((kpi) => (
             <KpiCard key={kpi.title} {...kpi} />
           ))}
+
           <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
@@ -847,7 +727,7 @@ export default function KpiDashboardPage() {
                 {selectedDay === "All Days"
                   ? getUniqueSessionsData?.total_unique_users?.toLocaleString() ??
                     "N/A"
-                  : analyticsDataI.usersPerDayChartData.find(
+                  : (analyticsDataI.usersPerDayChartData as any).find(
                       (d: any) => d.day === selectedDay
                     )?.users ?? 0}
               </div>
@@ -863,19 +743,22 @@ export default function KpiDashboardPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="All Days">All Days</SelectItem>
-                  {analyticsDataI.usersPerDayChartData.map((data: any) => (
-                    <SelectItem
-                      key={data.day}
-                      className="cursor-target"
-                      value={data.day}
-                    >
-                      {new Date(data.day).toLocaleDateString()}
-                    </SelectItem>
-                  ))}
+                  {/* {analyticsDataI.usersPerDayChartData.map(
+                    (data: { day: string; users: number }) => (
+                      <SelectItem
+                        key={data.day}
+                        className="cursor-target"
+                        value={data.day}
+                      >
+                        {new Date(data.day).toLocaleDateString()}
+                      </SelectItem>
+                    )
+                  )} */}
                 </SelectContent>
               </Select>
             </CardContent>
           </Card>
+
           <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
@@ -895,7 +778,7 @@ export default function KpiDashboardPage() {
                   <SelectValue placeholder="Select a button" />
                 </SelectTrigger>
                 <SelectContent>
-                  {analyticsData.uniqueButtonNames.map((buttonName) => (
+                  {analyticsData.uniqueButtonNames.map((buttonName: string) => (
                     <SelectItem
                       key={buttonName}
                       className="cursor-target"
@@ -910,16 +793,133 @@ export default function KpiDashboardPage() {
           </Card>
         </div>
       </div>
-      <div>
-        <h2 className="text-2xl font-headline font-semibold tracking-tight">
-          Key Web3 Metrics
-        </h2>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
-          {web3KpiData.map((kpi) => (
-            <KpiCard key={kpi.title} {...kpi} />
-          ))}
+
+      {/* Connected wallets section */}
+      {Array.isArray(connectedWalletsData) &&
+      connectedWalletsData.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-headline font-semibold tracking-tight">
+              Connected Wallets
+            </h2>
+            <Button
+              variant="default"
+              className="cursor-target"
+              onClick={() => setShowWeb3odal(true)}
+            >
+              Add a web3 wallet
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {(connectedWalletsData as WalletConn[]).map((w) => (
+              <Card
+                key={w.id}
+                className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg hover:shadow-xl transition cursor-pointer"
+                onClick={() => openWalletModal(w)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">
+                      {w.wallet_name || "Wallet"}
+                    </CardTitle>
+                    <Badge
+                      className={`${
+                        networkBadgeColor[w.network] ??
+                        "bg-muted text-foreground"
+                      }`}
+                    >
+                      {w.network}
+                    </Badge>
+                  </div>
+                  <CardDescription className="flex items-center gap-2 mt-1">
+                    <Hash className="h-3 w-3" />
+                    <span className="font-mono text-xs">
+                      {truncate(w.wallet_address, 8, 6)}
+                    </span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between text-sm">
+                  <div className="space-x-2">
+                    {w.is_verified ? (
+                      <Badge className="bg-emerald-500/10 text-emerald-500">
+                        Verified
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-amber-500 border-amber-500/50"
+                      >
+                        Unverified
+                      </Badge>
+                    )}
+                    {w.is_active ? (
+                      <Badge className="bg-blue-500/10 text-blue-500">
+                        Active
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">Inactive</Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Added{" "}
+                    {formatDistanceToNow(new Date(w.created_at), {
+                      addSuffix: true,
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <Button
+          variant="default"
+          className="cursor-target"
+          onClick={() => setShowWeb3odal(true)}
+        >
+          Add a web3 wallet
+        </Button>
+      )}
+
+      {Array.isArray(connectedWalletsData) &&
+        connectedWalletsData.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-headline font-semibold tracking-tight">
+              Key Web3 Metrics
+            </h2>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
+              {web3KpiData.map((kpi) => (
+                <KpiCard key={kpi.title} {...kpi} />
+              ))}
+            </div>
+          </div>
+        )}
+
+      {/* Wallet modal with connect flow */}
+      <WalletModal
+        open={showWeb3Modal}
+        onClose={() => setShowWeb3odal(false)}
+        companyId={documents?.id}
+        verifyEndpoint="/wallets/verify"
+        saveWalletEndpoint="/wallets/connections/"
+        onWalletLinked={() => {
+          setIsWeb3Added(true)
+          refetchConnectedWallets()
+        }}
+      />
+
+      {/* Web3 details modal */}
+      <WalletActivityModal
+        open={walletModalOpen}
+        onClose={() => setWalletModalOpen(false)}
+        wallet={selectedWallet}
+        companyId={documents?.id}
+        onVerified={() => refetchConnectedWallets()}
+        recentTransactions={sampleRecentTransactions}
+        allActivities={sampleAllActivities}
+        analytics={buildSampleAnalytics(selectedWallet)}
+      />
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -960,9 +960,7 @@ export default function KpiDashboardPage() {
                           new Date(
                             typeof startDate === "string"
                               ? startDate
-                              : startDate instanceof String
-                              ? startDate.toString()
-                              : startDate
+                              : (startDate as Date)
                           ),
                           "PPP"
                         )
@@ -977,9 +975,7 @@ export default function KpiDashboardPage() {
                         ? new Date(
                             typeof startDate === "string"
                               ? startDate
-                              : startDate instanceof String
-                              ? startDate.toString()
-                              : startDate
+                              : (startDate as Date)
                           )
                         : undefined
                     }
@@ -995,7 +991,7 @@ export default function KpiDashboardPage() {
                   <Button
                     variant={"outline"}
                     className={cn(
-                      "w-[140px] justify-start text-left font-normal",
+                      "w=[140px] justify-start text-left font-normal",
                       !endDate && "text-muted-foreground"
                     )}
                   >
@@ -1005,9 +1001,7 @@ export default function KpiDashboardPage() {
                           new Date(
                             typeof endDate === "string"
                               ? endDate
-                              : endDate instanceof String
-                              ? endDate.toString()
-                              : endDate
+                              : (endDate as Date)
                           ),
                           "PPP"
                         )
@@ -1022,9 +1016,7 @@ export default function KpiDashboardPage() {
                         ? new Date(
                             typeof endDate === "string"
                               ? endDate
-                              : endDate instanceof String
-                              ? endDate.toString()
-                              : endDate
+                              : (endDate as Date)
                           )
                         : undefined
                     }
@@ -1065,6 +1057,7 @@ export default function KpiDashboardPage() {
               )}
           </CardContent>
         </Card>
+
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader className="flex flex-row items-start justify-between space-x-2">
             <div>
@@ -1080,7 +1073,7 @@ export default function KpiDashboardPage() {
                 <SelectValue placeholder="Select a page" />
               </SelectTrigger>
               <SelectContent>
-                {analyticsData.uniquePagePaths.map((path) => (
+                {analyticsData.uniquePagePaths.map((path: any) => (
                   <SelectItem key={path} className="cursor-target" value={path}>
                     {path}
                   </SelectItem>
@@ -1129,6 +1122,7 @@ export default function KpiDashboardPage() {
             </ChartContainer>
           </CardContent>
         </Card>
+
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader className="flex flex-row items-start justify-between space-x-2">
             <div>
@@ -1145,7 +1139,7 @@ export default function KpiDashboardPage() {
                 <SelectValue placeholder="Select a button" />
               </SelectTrigger>
               <SelectContent>
-                {analyticsData.uniqueButtonNames.map((buttonName) => (
+                {analyticsData.uniqueButtonNames.map((buttonName: string) => (
                   <SelectItem
                     key={buttonName}
                     className="cursor-target"
@@ -1181,18 +1175,12 @@ export default function KpiDashboardPage() {
                   labelStyle={{ color: "hsl(var(--popover-foreground))" }}
                   itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                 />
-
                 <Line
                   type="monotone"
                   dataKey="clicks"
                   stroke="purple"
                   strokeWidth={6}
-                  dot={{
-                    r: 5,
-                    fill: "purple",
-                    strokeWidth: 2,
-                    stroke: "red",
-                  }}
+                  dot={{ r: 5, fill: "purple", strokeWidth: 2, stroke: "red" }}
                   activeDot={{ r: 7 }}
                 />
               </LineChart>

@@ -97,10 +97,16 @@ export const queryApi = createApi({
         url: "/dashboard/twitter-status",
       }),
     }),
+    connectedWallets: builder.query({
+      query: ({ id, isActive }: any) => ({
+        url: `/wallets/connections/?company_id=${id}&active_only=${isActive}`,
+      }),
+    }),
   }),
 })
 
 export const {
+  useConnectedWalletsQuery,
   useTwitterMentionsAnalyticsQuery,
   useCreatedtweetersQuery,
   useTweetesQuery,
