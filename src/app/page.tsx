@@ -5,7 +5,6 @@ import HeroSection from "@/components/landing/hero-section"
 import Footer from "@/components/layout/footer"
 import Header from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
 
 const PricingSection = () => {
   // Placeholder Pricing Section
@@ -116,7 +115,7 @@ const PricingSection = () => {
 const CTASection = () => {
   return (
     <section className="py-20 md:py-28 bg-gradient-to-br from-primary/20 via-background to-accent/20">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      {/* <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter mb-6">
           Ready to Master Your Web3 Analytics on Solana & Beyond?
         </h2>
@@ -132,7 +131,7 @@ const CTASection = () => {
             Start Your Free Trial Today
           </Button>
         </Link>
-      </div>
+      </div> */}
     </section>
   )
 }

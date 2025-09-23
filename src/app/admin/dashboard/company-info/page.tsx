@@ -881,7 +881,7 @@ export default function KpiDashboardPage() {
         </Button>
       )}
 
-      {Array.isArray(connectedWalletsData) &&
+      {/* {Array.isArray(connectedWalletsData) &&
         connectedWalletsData.length > 0 && (
           <div>
             <h2 className="text-2xl font-headline font-semibold tracking-tight">
@@ -893,7 +893,7 @@ export default function KpiDashboardPage() {
               ))}
             </div>
           </div>
-        )}
+        )} */}
 
       {/* Wallet modal with connect flow */}
       <WalletModal
