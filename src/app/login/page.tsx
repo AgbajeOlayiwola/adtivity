@@ -71,10 +71,11 @@ export default function LoginPage() {
   useEffect(() => {
     if (platformUserLoginSuccess && platformUserLoginData?.access_token) {
       dispatch(setToken(platformUserLoginData.access_token))
-      document.cookie = `token=${platformUserLoginData.access_token}; path=/; secure; samesite=strict`
-      setCookie("token", platformUserLoginData.access_token, {
+      setCookie("auth-token", platformUserLoginData?.access_token, {
         path: "/",
-        maxAge: 60 * 60 * 24, // 1 day
+        maxAge: 60 * 60 * 24, // 1 day (in seconds)
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production", // true on Vercel
       })
       window.location.href = "/admin/dashboard"
     } else if (platformUserLoginErr) {

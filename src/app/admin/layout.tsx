@@ -36,6 +36,7 @@ import { clearProfile, setProfile } from "@/redux/slices/profileSlice"
 import { clearApikey } from "@/redux/slices/qpikey"
 import { clearTwitterItems } from "@/redux/slices/twitterItems"
 import { clearToken } from "@/redux/slices/userTokenSlice"
+import { deleteCookie } from "cookies-next"
 import { Bell, ChevronDown, Search } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -52,13 +53,27 @@ export default function DashboardLayout({
   const settings = () => {
     window.location.href = "/admin/dashboard"
   }
+
   const LogOut = async () => {
-    await dispatch(clearToken())
-    await dispatch(clearProfile())
-    await dispatch(clearDocuments())
-    await dispatch(clearApikey())
-    await dispatch(clearTwitterItems())
-    window.location.href = "/login"
+    try {
+      await Promise.all([
+        dispatch(clearToken()),
+        dispatch(clearProfile()),
+        dispatch(clearDocuments()),
+        dispatch(clearApikey()),
+        dispatch(clearTwitterItems()),
+      ])
+
+      // remove the cookie the middleware checks
+      deleteCookie("auth-token", { path: "/" })
+
+      // (optional) if you also set "token" earlier
+      // deleteCookie("token", { path: "/" });
+
+      window.location.assign("/login")
+    } catch (e) {
+      console.error("Logout error:", e)
+    }
   }
   const {
     data: userInfoData,
