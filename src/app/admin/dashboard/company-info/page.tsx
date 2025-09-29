@@ -54,7 +54,7 @@ import { format, formatDistanceToNow } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 
 import RegionalHeatmap from "@/components/compnay-info/heatMap"
-import { WalletActivityModal } from "@/components/compnay-info/wallet/activity"
+import WalletActivityModal from "@/components/compnay-info/wallet/activity"
 import WalletModal from "@/components/compnay-info/wallet/add-wallet"
 import { Modal } from "@/components/modal"
 import {
@@ -915,9 +915,6 @@ export default function KpiDashboardPage() {
         wallet={selectedWallet}
         companyId={documents?.id}
         onVerified={() => refetchConnectedWallets()}
-        recentTransactions={sampleRecentTransactions}
-        allActivities={sampleAllActivities}
-        analytics={buildSampleAnalytics(selectedWallet)}
       />
 
       <div className="grid gap-6 md:grid-cols-2">
