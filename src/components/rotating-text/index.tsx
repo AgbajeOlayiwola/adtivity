@@ -1,3 +1,11 @@
+import {
+  AnimatePresence,
+  motion,
+  Transition,
+  type Target,
+  type TargetAndTransition,
+  type VariantLabels,
+} from "motion/react"
 import React, {
   forwardRef,
   useCallback,
@@ -6,14 +14,6 @@ import React, {
   useMemo,
   useState,
 } from "react"
-import {
-  motion,
-  AnimatePresence,
-  Transition,
-  type VariantLabels,
-  type Target,
-  type TargetAndTransition,
-} from "motion/react"
 
 function cn(...classes: (string | undefined | null | boolean)[]): string {
   return classes.filter(Boolean).join(" ")

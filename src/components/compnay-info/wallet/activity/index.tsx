@@ -32,6 +32,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { X } from "lucide-react"
 
+// ✅ Growth image component
+import GrowthImage from "@/components/compnay-info/growth-image"
+
 // ------------------------------------------------------------
 // Types
 // ------------------------------------------------------------
@@ -301,34 +304,6 @@ export default function WalletActivityModal({
     "unique" | "returning" | null
   >(null)
 
-  // Initial fetch
-  useEffect(() => {
-    if (!open || !wallet) return
-    fetchAnalytics()
-    fetchActivities()
-    if (activeTab === "recent") fetchRecent()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, wallet?.id])
-
-  useEffect(() => {
-    if (!open || !wallet) return
-    if (activeTab === "recent") fetchRecent()
-    if (activeTab === "activity") fetchActivities()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
-
-  useEffect(() => {
-    if (!open || !wallet) return
-    fetchRecent()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recentHours])
-
-  useEffect(() => {
-    if (!open || !wallet) return
-    fetchActivities()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actLimit, actOffset, startDate, endDate])
-
   // ---------------------- API calls ----------------------
   async function fetchAnalytics() {
     if (!wallet) return
@@ -400,6 +375,34 @@ export default function WalletActivityModal({
       setActivityLoading(false)
     }
   }
+
+  // Initial fetch
+  useEffect(() => {
+    if (!open || !wallet) return
+    fetchAnalytics()
+    fetchActivities()
+    if (activeTab === "recent") fetchRecent()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, wallet?.id])
+
+  useEffect(() => {
+    if (!open || !wallet) return
+    if (activeTab === "recent") fetchRecent()
+    if (activeTab === "activity") fetchActivities()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  useEffect(() => {
+    if (!open || !wallet) return
+    fetchRecent()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recentHours])
+
+  useEffect(() => {
+    if (!open || !wallet) return
+    fetchActivities()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actLimit, actOffset, startDate, endDate])
 
   // Pre-guard computed values (null-safe)
   const canonicalWalletAddress = normalizeAddressSoft(
@@ -603,36 +606,23 @@ export default function WalletActivityModal({
     }
   }, [counterpartyAggs])
 
-  // Contract usage placeholder (not rendered yet)
-  const _topContracts = useMemo(() => {
-    const map = new Map<
-      string,
-      { addr: string; txCount: number; volumeUsd: number }
-    >()
-    for (const tx of activities || []) {
-      const contract =
-        (tx as any)?.transaction_metadata?.contract_address ||
-        tx.token_address ||
-        ""
-      const key = (contract || "").trim().toLowerCase()
-      if (!key) continue
-      const amt = Number(tx.amount_usd || 0) || 0
-      const prev = map.get(key) || { addr: key, txCount: 0, volumeUsd: 0 }
-      prev.txCount += 1
-      prev.volumeUsd += amt
-      map.set(key, prev)
-    }
-    return [...map.values()]
-      .sort((a, b) => b.txCount - a.txCount || b.volumeUsd - a.volumeUsd)
-      .slice(0, 10)
-  }, [activities])
+  // ===================== NEW: Web3 events for GrowthImage =====================
+  // ✅ Keep this ABOVE the guard so Hooks order never changes
+  const web3ShareEvents = useMemo(
+    () =>
+      (activities || []).map((tx) => ({
+        event_name: "Token Transferred",
+        timestamp: tx.timestamp,
+      })),
+    [activities]
+  )
 
   // ✅ Guard AFTER all hooks so order never changes
   if (!open || !wallet) return null
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-      <Card className="w-[95%] max-w-5xl max-h-[85vh] overflow-hidden bg-card/95 backdrop-blur-sm shadow-xl relative">
+    <div className="mt-0 fixed h-[100vh] inset-0 z-[10] flex items-center justify-center bg-black/50">
+      <Card className="w-[95%] max-w-5xl max-h-[85vh] overflow-scroll bg-card/95 backdrop-blur-sm shadow-xl relative">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
@@ -656,7 +646,14 @@ export default function WalletActivityModal({
                   {wallet.network}
                 </Badge>
                 <span className="font-mono text-xs">
-                  {truncate(canonicalWalletAddress, 10, 8)}
+                  {truncate(
+                    normalizeAddressSoft(
+                      wallet?.network ?? "",
+                      wallet?.wallet_address ?? null
+                    ),
+                    10,
+                    8
+                  )}
                 </span>
                 {wallet.is_verified ? (
                   <Badge className="bg-emerald-500/10 text-emerald-500">
@@ -671,19 +668,24 @@ export default function WalletActivityModal({
                   </Badge>
                 )}
               </CardDescription>
-              {wallet.network === "solana" && solanaAddrInvalid && (
-                <p className="text-xs text-amber-500 mt-2">
-                  This saved Solana address looks invalid. Please re-link the
-                  wallet before verifying.
-                </p>
-              )}
+              {wallet.network === "solana" &&
+                !isValidSolanaAddress(wallet?.wallet_address ?? null) && (
+                  <p className="text-xs text-amber-500 mt-2">
+                    This saved Solana address looks invalid. Please re-link the
+                    wallet before verifying.
+                  </p>
+                )}
             </div>
 
             <div className="flex items-center gap-2">
               {!wallet.is_verified && (
                 <Button
                   onClick={handleVerifyClick}
-                  disabled={busy || solanaAddrInvalid}
+                  disabled={
+                    busy ||
+                    (wallet.network === "solana" &&
+                      !isValidSolanaAddress(wallet?.wallet_address ?? null))
+                  }
                   className="cursor-target"
                 >
                   {busy ? "Verifying…" : "Verify Wallet"}
@@ -863,6 +865,39 @@ export default function WalletActivityModal({
                   </Card>
                 </div>
               ) : null}
+
+              {/* ✅ Shareable Growth Image (Web3) */}
+              <div className="mt-6">
+                <GrowthImage
+                  dateRange={{
+                    startDate: startDate ?? null,
+                    endDate: endDate ?? null,
+                  }}
+                  selected={{
+                    pagePath: "All Pages",
+                    buttonName: "All Clicks",
+                    country: "World View",
+                  }}
+                  options={{
+                    pagePaths: ["All Pages"],
+                    buttonNames: ["All Clicks"],
+                  }}
+                  datasets={{
+                    web2: {
+                      pageViewsPerDay: [],
+                      clicksPerDay: [],
+                      usersPerDay: [],
+                      totalUniqueUsers: 0,
+                      regional: [],
+                      rawEvents: [],
+                    },
+                    web3: {
+                      events: web3ShareEvents,
+                      connectedWallets: [],
+                    },
+                  }}
+                />
+              </div>
             </TabsContent>
 
             {/* Recent */}

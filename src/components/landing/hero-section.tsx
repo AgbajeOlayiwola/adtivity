@@ -18,10 +18,10 @@ const HeroSection = () => {
             </span>
 
             <h1 className="font-headline text-5xl md:text-6xl lg:text-7xl font-bold tracking-tighter mb-6">
-              Measure Your Impact on{" "}
+              Measure Your Impact
               <span className="bg-clip-text text-transparent ">
                 <RotatingText
-                  texts={["Web3", "Web2", "Data", "Twitter"]}
+                  texts={["On-Chain", "Off-Chain", "Socially"]}
                   mainClassName="px-2 sm:px-2 md:px-3 bg-cyan-300 text-black overflow-hidden py-0.5 sm:py-1 md:py-2 justify-center rounded-lg w-fit bg-futuristic-gradient"
                   staggerFrom={"last"}
                   initial={{ y: "100%" }}
@@ -35,18 +35,18 @@ const HeroSection = () => {
               </span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl mx-auto md:mx-0">
-              Adtivity is a measurement and attribution platform for Web 3,
-              providing clear insights for your decentralized applications,
-              including Solana and EVM-compatible chains. Track user activity
-              and key on-chain data.
+              Adtivity unifies on-chain, off-chain, and social analytics into a
+              single source of truth, helping teams understand user behavior,
+              measure performance, and prove growth with precision, enabling
+              startups to scale from zero to IPO.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-              <Link href="/dashboard">
+              <Link href="/signup">
                 <Button
                   size="lg"
                   className="cursor-target w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8 py-3 text-lg shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
                 >
-                  Explore Dashboard
+                  Explore with us
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>

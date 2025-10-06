@@ -15,15 +15,16 @@ import {
 import storage from "redux-persist/lib/storage"
 import { mutationApi } from "../api/mutationApi"
 import { queryApi } from "../api/queryApi"
+import analyticsDataReducer from "../slices/abalyticsDataSlice"
 import agentDetailsReducer from "../slices/agentDetailsSlice"
 import documentReducer from "../slices/documents"
 import merchantCountReducer from "../slices/merchantCount"
 import profileImageReducer from "../slices/profileImageSlice"
 import progileReducer from "../slices/profileSlice"
 import apikeyReducer from "../slices/qpikey"
+import twitterItemsReducer from "../slices/twitterItems"
 import tokenReducer from "../slices/userTokenSlice"
 import yearlyTargetReducer from "../slices/yearlyTargetSlice"
-import twitterItemsReducer from "../slices/twitterItems"
 const reducers = combineReducers({
   [mutationApi.reducerPath]: mutationApi.reducer,
   [queryApi.reducerPath]: queryApi.reducer,
@@ -36,6 +37,7 @@ const reducers = combineReducers({
   documents: documentReducer,
   apikey: apikeyReducer,
   twitterItems: twitterItemsReducer,
+  analyticsData: analyticsDataReducer,
 })
 
 const persistConfig = {
@@ -52,6 +54,7 @@ const persistConfig = {
     "apikeyReducer",
     "apikey",
     "twitterItems",
+    "analyticsData",
   ],
 }
 

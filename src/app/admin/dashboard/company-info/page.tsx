@@ -11,16 +11,14 @@ import {
 } from "@/components/ui/card"
 import { ChartContainer } from "@/components/ui/chart"
 import {
+  Calendar as CalendarIcon,
   Eye,
-  FilePlus2,
   Hash,
   RefreshCcw,
-  Repeat,
   Target,
   Trash2,
   TrendingUp,
   Users,
-  Wallet,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useSelector } from "react-redux"
@@ -51,7 +49,6 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format, formatDistanceToNow } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react"
 
 import RegionalHeatmap from "@/components/compnay-info/heatMap"
 import WalletActivityModal from "@/components/compnay-info/wallet/activity"
@@ -65,11 +62,71 @@ import {
   useGetUniqueSessionsQuery,
 } from "@/redux/api/queryApi"
 
+// Reusable AI analytics launcher
+
+// Growth image (shareable)
+import AIAnalytics from "@/components/compnay-info/ai-analytics"
+import GrowthImage from "@/components/compnay-info/growth-image"
+import * as React from "react"
+
 const chartConfig = {
   sales: { label: "Sales", color: "hsl(var(--chart-1))" },
   revenue: { label: "Revenue", color: "hsl(var(--chart-2))" },
   views: { label: "Page Views", color: "hsl(var(--accent))" },
   clicks: { label: "Clicks", color: "hsl(var(--purple-500))" },
+}
+
+// ------------------------------------------------------------
+// StickySelect: keeps the dropdown open during selection
+// ------------------------------------------------------------
+
+type StickySelectProps = {
+  value: string
+  onValueChange: (v: string) => void
+  placeholder?: string
+  triggerClassName?: string
+  contentClassName?: string
+  children: React.ReactNode
+}
+
+function StickySelect({
+  value,
+  onValueChange,
+  placeholder,
+  triggerClassName,
+  contentClassName,
+  children,
+}: StickySelectProps) {
+  const [open, setOpen] = useState(false)
+
+  const handleValueChange = (v: string) => {
+    onValueChange(v)
+    // Radix closes on select by default; reopen on next frame
+    requestAnimationFrame(() => setOpen(true))
+  }
+
+  return (
+    <Select
+      value={value}
+      open={open}
+      onOpenChange={setOpen}
+      onValueChange={handleValueChange}
+    >
+      <SelectTrigger
+        className={cn("cursor-target w-[180px]", triggerClassName)}
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent
+        className={contentClassName}
+        onInteractOutside={() => setOpen(false)}
+        onEscapeKeyDown={() => setOpen(false)}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        {children}
+      </SelectContent>
+    </Select>
+  )
 }
 
 // ------------------------------------------------------------
@@ -161,15 +218,7 @@ export default function KpiDashboardPage() {
 
   const [selectedCountry, setSelectedCountry] = useState("World View")
 
-  const { documents, apikey, token }: any = useSelector((store) => store)
-  const [salesData] = useState([
-    { month: "Jan", sales: 1500, revenue: 35000 },
-    { month: "Feb", sales: 1800, revenue: 42000 },
-    { month: "Mar", sales: 1650, revenue: 38000 },
-    { month: "Apr", sales: 1900, revenue: 45000 },
-    { month: "May", sales: 2100, revenue: 51000 },
-    { month: "Jun", sales: 2050, revenue: 49000 },
-  ])
+  const { documents, apikey }: any = useSelector((store) => store)
 
   const {
     data: web2Events,
@@ -239,6 +288,47 @@ export default function KpiDashboardPage() {
 
   const [selectedDay, setSelectedDay] = useState("All Days")
 
+  useEffect(() => {
+    if (getUniqueSessionsSuccess && getUniqueSessionsData) {
+      const usersByDay = getUniqueSessionsData.users_per_day.map((entry) => ({
+        day: entry.day,
+        users: entry.users,
+      }))
+      setAnalyticsDataI((prev: any) => ({
+        ...prev,
+        uniqueSessions: getUniqueSessionsData.total_unique_users,
+        usersPerDayChartData: usersByDay,
+      }))
+    }
+  }, [getUniqueSessionsSuccess, getUniqueSessionsData])
+
+  const web3Events = Array.isArray(web3EventsRaw) ? web3EventsRaw : []
+
+  useEffect(() => {
+    if (isWeb2Success && isWeb3Success) {
+      const combinedEvents = [
+        ...(Array.isArray(web2Events) ? web2Events : []),
+        ...(Array.isArray(web3Events) ? web3Events : []),
+      ]
+      setRawEvents(combinedEvents)
+      const processedData: any = calculateDashboardMetrics(combinedEvents)
+      setAnalyticsData(processedData)
+      setSelectedButton("All Clicks")
+      setSelectedPage("All Pages")
+    } else if (isWeb2Error || isWeb3Error) {
+      console.error("Failed to fetch analytics data:", web2Error || web3Error)
+    }
+  }, [
+    isWeb2Success,
+    isWeb3Success,
+    web2Events,
+    web3Events,
+    isWeb2Error,
+    isWeb3Error,
+    web2Error,
+    web3Error,
+  ])
+
   const calculateDashboardMetrics = (events: any[]) => {
     const sessions = new Set<string>()
     const heroClicks = events.filter(
@@ -281,54 +371,13 @@ export default function KpiDashboardPage() {
     }
   }
 
-  useEffect(() => {
-    if (getUniqueSessionsSuccess && getUniqueSessionsData) {
-      const usersByDay = getUniqueSessionsData.users_per_day.map((entry) => ({
-        day: entry.day,
-        users: entry.users,
-      }))
-      setAnalyticsDataI((prev: any) => ({
-        ...prev,
-        uniqueSessions: getUniqueSessionsData.total_unique_users,
-        usersPerDayChartData: usersByDay,
-      }))
-    }
-  }, [getUniqueSessionsSuccess, getUniqueSessionsData])
-
-  const web3Events = Array.isArray(web3EventsRaw) ? web3EventsRaw : []
-
-  useEffect(() => {
-    if (isWeb2Success && isWeb3Success) {
-      const combinedEvents = [
-        ...(Array.isArray(web2Events) ? web2Events : []),
-        ...(Array.isArray(web3Events) ? web3Events : []),
-      ]
-      setRawEvents(combinedEvents)
-      const processedData: any = calculateDashboardMetrics(combinedEvents)
-      setAnalyticsData(processedData)
-      setSelectedButton("All Clicks")
-      setSelectedPage("All Pages")
-    } else if (isWeb2Error || isWeb3Error) {
-      console.error("Failed to fetch analytics data:", web2Error || web3Error)
-    }
-  }, [
-    isWeb2Success,
-    isWeb3Success,
-    web2Events,
-    web3Events,
-    isWeb2Error,
-    isWeb3Error,
-    web2Error,
-    web3Error,
-  ])
-
   const totalHeroClicks = useMemo(() => {
     if (!rawEvents.length) return 0
     const filteredClicks = rawEvents.filter((event: any) => {
       if (selectedButton === "All Clicks") {
         return (
           event.event_name.startsWith("Button:") ||
-          event.event_name.startsWith("Button:")
+          event.event_name.startsWith("Hero:")
         )
       }
       return event.event_name === selectedButton
@@ -378,7 +427,7 @@ export default function KpiDashboardPage() {
         (event: any) =>
           (selectedButton === "All Clicks" &&
             (event.event_name.startsWith("Button:") ||
-              event.event_name.startsWith("Button:"))) ||
+              event.event_name.startsWith("Hero:"))) ||
           event.event_name === selectedButton
       )
       .reduce((acc: any, event: any) => {
@@ -439,39 +488,6 @@ export default function KpiDashboardPage() {
     },
   ]
 
-  const web3KpiData = [
-    {
-      title: "Total Token Transfers",
-      value: web3Kpis.totalTokenTransfers.toLocaleString(),
-      icon: Repeat,
-      iconColorClass: "text-purple-500",
-      description: "Total token transfer events recorded.",
-    },
-    {
-      title: "Active Wallets",
-      value: web3Kpis.activeWallets.toLocaleString(),
-      icon: Wallet,
-      iconColorClass: "text-accent",
-      description: "Unique wallets involved in token transfers.",
-    },
-    {
-      title: "Transaction Volume (24h)",
-      value: web3Kpis.tokenSymbol
-        ? `${web3Kpis.transactionVolume.toFixed(2)} ${web3Kpis.tokenSymbol}`
-        : "N/A",
-      icon: TrendingUp,
-      iconColorClass: "text-primary",
-      description: "Total volume of token transfers in the last 24 hours.",
-    },
-    {
-      title: "New Contracts Deployed",
-      value: "0",
-      icon: FilePlus2,
-      iconColorClass: "text-accent",
-      description: "Smart contracts deployed to your platform this week.",
-    },
-  ]
-
   const isLoading = isWeb2Loading || isWeb3Loading || getRegionalDataLoading
   const error = isWeb2Error
     ? web2Error
@@ -516,12 +532,12 @@ export default function KpiDashboardPage() {
   }, [regionalData])
 
   const handleDeleteEvents = () => {
-    console.log("Deleting all events...")
+    console.log("Deleting all events…")
     setShowDeleteModal(false)
   }
 
   const handleRegenerateApiKey = () => {
-    console.log("Regenerating API key...")
+    console.log("Regenerating API key…")
     setShowRegenerateModal(false)
   }
 
@@ -535,76 +551,6 @@ export default function KpiDashboardPage() {
     setSelectedWallet(wallet)
     setWalletModalOpen(true)
   }
-
-  // Mock adapters for the three datasets you provided
-  const buildSampleAnalytics = (
-    wallet: WalletConn | null
-  ): WalletAnalytics | null => {
-    if (!wallet) return null
-    return {
-      wallet_address: wallet.wallet_address,
-      total_transactions: 12,
-      total_volume_usd: "14823.19",
-      unique_tokens: 5,
-      networks: [wallet.network],
-      transaction_types: { transfer: 9, swap: 2, approve: 1 },
-      daily_activity: [],
-      top_tokens: [],
-      gas_spent_usd: "42.17",
-      first_transaction: "2025-09-20T10:39:19.204Z",
-      last_transaction: "2025-09-22T02:39:19.204Z",
-    }
-  }
-
-  const sampleRecentTransactions: Txn[] = [
-    {
-      transaction_hash: "0xabc123…",
-      block_number: 1,
-      transaction_type: "transfer",
-      from_address: "0xFrom…",
-      to_address: "0xTo…",
-      token_address: "0xToken…",
-      token_symbol: "USDC",
-      token_name: "USD Coin",
-      amount: "250.00",
-      amount_usd: "250.00",
-      gas_used: 42000,
-      gas_price: "12 gwei",
-      gas_fee_usd: "0.45",
-      network: "ethereum",
-      status: "confirmed",
-      timestamp: "2025-09-22T02:37:28.567Z",
-      transaction_metadata: {},
-      id: "tx_1",
-      wallet_connection_id: "",
-      created_at: "2025-09-22T02:37:28.567Z",
-    },
-  ]
-
-  const sampleAllActivities: Txn[] = [
-    {
-      transaction_hash: "0xdef456…",
-      block_number: 2,
-      transaction_type: "swap",
-      from_address: "0xFrom…",
-      to_address: "0xTo…",
-      token_address: "0xToken…",
-      token_symbol: "SOL",
-      token_name: "Solana",
-      amount: "1.2",
-      amount_usd: "225.60",
-      gas_used: 5000,
-      gas_price: "n/a",
-      gas_fee_usd: "0.01",
-      network: "solana",
-      status: "confirmed",
-      timestamp: "2025-09-22T02:38:53.203Z",
-      transaction_metadata: {},
-      id: "tx_2",
-      wallet_connection_id: "",
-      created_at: "2025-09-22T02:38:53.203Z",
-    },
-  ]
 
   if (isLoading) {
     return (
@@ -651,12 +597,58 @@ export default function KpiDashboardPage() {
         <h1 className="text-3xl font-headline font-semibold tracking-tight">
           Business Overview
         </h1>
+
+        {/* Top actions row */}
         <div className="rounded-xl px-3 py-4 w-full">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <p className="text-[#fff] text-[17px]">
               Keep this key safe: {apikey?.apiKey}
             </p>
-            <div className="flex space-x-2">
+
+            {/* Reusable AI Analytics launcher */}
+            <AIAnalytics
+              companyId={documents?.id ?? null}
+              timeRange={{
+                startDate: startDate ? String(startDate) : null,
+                endDate: endDate ? String(endDate) : null,
+              }}
+              filters={{
+                selectedButton,
+                selectedPage,
+                selectedCountry,
+              }}
+              datasets={{
+                pageViews: pageViewsChartData,
+                clicks: clicksChartData,
+                usersPerDay: getUniqueSessionsData,
+                regional: regionalData,
+                web3Events: Array.isArray(web3Events) ? web3Events : [],
+                wallets: Array.isArray(connectedWalletsData)
+                  ? (connectedWalletsData as any[])
+                  : [],
+                rawEvents,
+              }}
+              visibleOptions={[
+                "pageViews",
+                "clicks",
+                "usersPerDay",
+                "regional",
+                "web3Events",
+                "wallets",
+                "rawEvents",
+              ]}
+              defaultSelected={{
+                pageViews: true,
+                clicks: true,
+              }}
+              onBeforeOpen={(payload) => {
+                // Optional: inspect/mutate or abort (return false to stop)
+                console.log("AI analytics payload:", payload)
+              }}
+            />
+
+            {/* Maintenance buttons */}
+            <div className="flex flex-wrap gap-2 items-center">
               <Button
                 variant="outline"
                 onClick={() => setShowRegenerateModal(true)}
@@ -692,22 +684,18 @@ export default function KpiDashboardPage() {
               <p className="text-xs text-muted-foreground mt-2">
                 Views based on selected path
               </p>
-              <Select value={selectedPage} onValueChange={setSelectedPage}>
-                <SelectTrigger className="cursor-target w-[180px] mt-2">
-                  <SelectValue placeholder="Select a page" />
-                </SelectTrigger>
-                <SelectContent>
-                  {analyticsData.uniquePagePaths.map((path: any) => (
-                    <SelectItem
-                      key={path}
-                      className="cursor-target"
-                      value={path}
-                    >
-                      {path}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+              <StickySelect
+                value={selectedPage}
+                onValueChange={setSelectedPage}
+                placeholder="Select a page"
+              >
+                {analyticsData.uniquePagePaths.map((path: any) => (
+                  <SelectItem key={path} className="cursor-target" value={path}>
+                    {path}
+                  </SelectItem>
+                ))}
+              </StickySelect>
             </CardContent>
           </Card>
 
@@ -737,25 +725,14 @@ export default function KpiDashboardPage() {
                   ? "all days"
                   : new Date(selectedDay).toLocaleDateString()}
               </p>
-              <Select value={selectedDay} onValueChange={setSelectedDay}>
-                <SelectTrigger className="cursor-target w-[180px] mt-2">
-                  <SelectValue placeholder="Select a day" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All Days">All Days</SelectItem>
-                  {/* {analyticsDataI.usersPerDayChartData.map(
-                    (data: { day: string; users: number }) => (
-                      <SelectItem
-                        key={data.day}
-                        className="cursor-target"
-                        value={data.day}
-                      >
-                        {new Date(data.day).toLocaleDateString()}
-                      </SelectItem>
-                    )
-                  )} */}
-                </SelectContent>
-              </Select>
+
+              <StickySelect
+                value={selectedDay}
+                onValueChange={setSelectedDay}
+                placeholder="Select a day"
+              >
+                <SelectItem value="All Days">All Days</SelectItem>
+              </StickySelect>
             </CardContent>
           </Card>
 
@@ -773,22 +750,22 @@ export default function KpiDashboardPage() {
               <p className="text-xs text-muted-foreground mt-2">
                 Clicks on the hero section
               </p>
-              <Select value={selectedButton} onValueChange={setSelectedButton}>
-                <SelectTrigger className="cursor-target w-[180px] mt-2">
-                  <SelectValue placeholder="Select a button" />
-                </SelectTrigger>
-                <SelectContent>
-                  {analyticsData.uniqueButtonNames.map((buttonName: string) => (
-                    <SelectItem
-                      key={buttonName}
-                      className="cursor-target"
-                      value={buttonName}
-                    >
-                      {buttonName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+              <StickySelect
+                value={selectedButton}
+                onValueChange={setSelectedButton}
+                placeholder="Select a button"
+              >
+                {analyticsData.uniqueButtonNames.map((buttonName: string) => (
+                  <SelectItem
+                    key={buttonName}
+                    className="cursor-target"
+                    value={buttonName}
+                  >
+                    {buttonName}
+                  </SelectItem>
+                ))}
+              </StickySelect>
             </CardContent>
           </Card>
         </div>
@@ -881,20 +858,6 @@ export default function KpiDashboardPage() {
         </Button>
       )}
 
-      {/* {Array.isArray(connectedWalletsData) &&
-        connectedWalletsData.length > 0 && (
-          <div>
-            <h2 className="text-2xl font-headline font-semibold tracking-tight">
-              Key Web3 Metrics
-            </h2>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
-              {web3KpiData.map((kpi) => (
-                <KpiCard key={kpi.title} {...kpi} />
-              ))}
-            </div>
-          </div>
-        )} */}
-
       {/* Wallet modal with connect flow */}
       <WalletModal
         open={showWeb3Modal}
@@ -917,6 +880,9 @@ export default function KpiDashboardPage() {
         onVerified={() => refetchConnectedWallets()}
       />
 
+      {/* -------------------------------------------------- */}
+      {/* Regional + Charts                                    */}
+      {/* -------------------------------------------------- */}
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -927,21 +893,19 @@ export default function KpiDashboardPage() {
               </CardTitle>
             </div>
             <div className="flex gap-2">
-              <Select
+              <StickySelect
                 value={selectedCountry}
                 onValueChange={setSelectedCountry}
+                placeholder="Select a Country"
+                triggerClassName="w-[180px]"
               >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select a Country" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueCountries.map((country) => (
-                    <SelectItem key={country} value={country}>
-                      {country}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {uniqueCountries.map((country) => (
+                  <SelectItem key={country} value={country}>
+                    {country}
+                  </SelectItem>
+                ))}
+              </StickySelect>
+
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -1055,6 +1019,7 @@ export default function KpiDashboardPage() {
           </CardContent>
         </Card>
 
+        {/* ----------- Chart: Page Views ----------- */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader className="flex flex-row items-start justify-between space-x-2">
             <div>
@@ -1065,61 +1030,72 @@ export default function KpiDashboardPage() {
                 Page views over the last 7 days.
               </CardDescription>
             </div>
-            <Select value={selectedPage} onValueChange={setSelectedPage}>
-              <SelectTrigger className="cursor-target w-[180px]">
-                <SelectValue placeholder="Select a page" />
-              </SelectTrigger>
-              <SelectContent>
-                {analyticsData.uniquePagePaths.map((path: any) => (
-                  <SelectItem key={path} className="cursor-target" value={path}>
-                    {path}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <StickySelect
+              value={selectedPage}
+              onValueChange={setSelectedPage}
+              placeholder="Select a page"
+            >
+              {analyticsData.uniquePagePaths.map((path: any) => (
+                <SelectItem key={path} className="cursor-target" value={path}>
+                  {path}
+                </SelectItem>
+              ))}
+            </StickySelect>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <LineChart data={pageViewsChartData} accessibilityLayer>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border)/0.5)"
-                />
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
-                <RechartsTooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                  }}
-                  labelStyle={{ color: "hsl(var(--popover-foreground))" }}
-                  itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="views"
-                  stroke="var(--color-views)"
-                  strokeWidth={3}
-                  dot={{
-                    r: 5,
-                    fill: "var(--color-views)",
-                    strokeWidth: 2,
-                    stroke: "hsl(var(--background))",
-                  }}
-                  activeDot={{ r: 7 }}
-                />
-              </LineChart>
-            </ChartContainer>
+            <div className="p-4 rounded-xl bg-white">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">
+                  {String(startDate) || "All time"} → {String(endDate) || "Now"}
+                </span>
+                <span className="text-xs font-medium">{selectedPage}</span>
+              </div>
+              <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                <LineChart data={pageViewsChartData} accessibilityLayer>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border)/0.5)"
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    stroke="hsl(var(--muted-foreground))"
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                    }}
+                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="views"
+                    stroke="var(--color-views)"
+                    strokeWidth={3}
+                    dot={{
+                      r: 5,
+                      fill: "var(--color-views)",
+                      strokeWidth: 2,
+                      stroke: "hsl(var(--background))",
+                    }}
+                    activeDot={{ r: 7 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+              <div className="mt-2 text-[10px] text-gray-400">
+                Generated by Adtivity — Page Views
+              </div>
+            </div>
           </CardContent>
         </Card>
 
+        {/* ----------- Chart: Clicks ----------- */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader className="flex flex-row items-start justify-between space-x-2">
             <div>
@@ -1131,60 +1107,108 @@ export default function KpiDashboardPage() {
                 Buttons clicked over the last 7 days.
               </CardDescription>
             </div>
-            <Select value={selectedButton} onValueChange={setSelectedButton}>
-              <SelectTrigger className="cursor-target w-[180px]">
-                <SelectValue placeholder="Select a button" />
-              </SelectTrigger>
-              <SelectContent>
-                {analyticsData.uniqueButtonNames.map((buttonName: string) => (
-                  <SelectItem
-                    key={buttonName}
-                    className="cursor-target"
-                    value={buttonName}
-                  >
-                    {buttonName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <StickySelect
+              value={selectedButton}
+              onValueChange={setSelectedButton}
+              placeholder="Select a button"
+            >
+              {analyticsData.uniqueButtonNames.map((buttonName: string) => (
+                <SelectItem
+                  key={buttonName}
+                  className="cursor-target"
+                  value={buttonName}
+                >
+                  {buttonName}
+                </SelectItem>
+              ))}
+            </StickySelect>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <LineChart data={clicksChartData} accessibilityLayer>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border)/0.5)"
-                />
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
-                <RechartsTooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                  }}
-                  labelStyle={{ color: "hsl(var(--popover-foreground))" }}
-                  itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="clicks"
-                  stroke="purple"
-                  strokeWidth={6}
-                  dot={{ r: 5, fill: "purple", strokeWidth: 2, stroke: "red" }}
-                  activeDot={{ r: 7 }}
-                />
-              </LineChart>
-            </ChartContainer>
+            <div className="p-4 rounded-xl bg-white">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">
+                  {String(startDate) || "All time"} → {String(endDate) || "Now"}
+                </span>
+                <span className="text-xs font-medium">{selectedButton}</span>
+              </div>
+              <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                <LineChart data={clicksChartData} accessibilityLayer>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border)/0.5)"
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    stroke="hsl(var(--muted-foreground))"
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                    }}
+                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="clicks"
+                    stroke="purple"
+                    strokeWidth={6}
+                    dot={{
+                      r: 5,
+                      fill: "purple",
+                      strokeWidth: 2,
+                      stroke: "red",
+                    }}
+                    activeDot={{ r: 7 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+              <div className="mt-2 text-[10px] text-gray-400">
+                Generated by Adtivity — Button Clicks
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Shareable Growth Image component (receives both web2 + web3 data) */}
+      <GrowthImage
+        dateRange={{
+          startDate: startDate ? String(startDate) : null,
+          endDate: endDate ? String(endDate) : null,
+        }}
+        selected={{
+          pagePath: selectedPage,
+          buttonName: selectedButton,
+          country: selectedCountry,
+        }}
+        options={{
+          pagePaths: analyticsData.uniquePagePaths,
+          buttonNames: analyticsData.uniqueButtonNames,
+        }}
+        datasets={{
+          web2: {
+            pageViewsPerDay: pageViewsChartData,
+            clicksPerDay: clicksChartData,
+            usersPerDay: analyticsDataI.usersPerDayChartData ?? [],
+            totalUniqueUsers: getUniqueSessionsData?.total_unique_users ?? 0,
+            regional: regionalData,
+            rawEvents,
+          },
+          web3: {
+            events: web3Events,
+            connectedWallets: Array.isArray(connectedWalletsData)
+              ? (connectedWalletsData as any[])
+              : [],
+          },
+        }}
+      />
     </div>
   )
 }

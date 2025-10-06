@@ -22,7 +22,6 @@ import {
 import { z } from "zod"
 
 // ---------------------- helpers ----------------------
-// Transform mentions_by_date into a format that Recharts can use.
 const transformMentions = (
   mentionsByDate: Record<string, number> | undefined
 ) => {
@@ -33,11 +32,31 @@ const transformMentions = (
   }))
 }
 
+const transformFollowers = (
+  followersByDate: Record<string, number> | undefined
+) => {
+  if (!followersByDate || Object.keys(followersByDate).length === 0) return []
+  return Object.keys(followersByDate).map((date) => ({
+    date,
+    followers: followersByDate[date] ?? 0,
+  }))
+}
+
+const percent = (num?: number, denom?: number) => {
+  if (!denom || denom <= 0 || !Number.isFinite(denom)) return "N/A"
+  const v = ((num || 0) / denom) * 100
+  return `${v.toFixed(2)}%`
+}
+
+const safeToLocale = (n?: number) =>
+  typeof n === "number" && Number.isFinite(n) ? n.toLocaleString() : "N/A"
+
+// ---------------------- schema ----------------------
 const loginSchema = z.object({
   userName: z.string().min(1, { message: "Username cannot be empty." }),
 })
 
-// Types for the tweet generator
+// ---------------------- types ----------------------
 type TweetIdea = {
   id: string
   text: string
@@ -74,13 +93,11 @@ const TwitterAnalytics = () => {
   }
   const twitterId = profile?.twitter_profiles?.[0]?.id
 
-  // 2) Don't fire the query until we actually have an id
   const {
     data: analyticsData,
     isLoading: analyticsLoad,
     isSuccess: analyticsSuccess,
   }: any = useTwitterMentionsAnalyticsQuery(twitterId!, {
-    // RTK Query "skip" option – prevents the hook from running until truthy
     skip: !twitterId,
   })
 
@@ -89,11 +106,149 @@ const TwitterAnalytics = () => {
   const noTwitterIntegration =
     createdTweeterData?.has_twitter_integration === false
 
-  // Combine backend data for charts
+  // -------- Derived series --------
   const mentionsSeries = useMemo(
     () => transformMentions(analyticsData?.mentions_by_date || {}),
     [analyticsData]
   )
+
+  const followerSeries = useMemo(
+    () => transformFollowers(analyticsData?.followers_by_date),
+    [analyticsData]
+  )
+
+  // -------- Derived KPIs (guarded) --------
+  const totals = useMemo(() => {
+    const totalsObj = analyticsData?.totals || analyticsData || {}
+    const totalMentions =
+      totalsObj.total_mentions ??
+      (Array.isArray(mentionsSeries)
+        ? mentionsSeries.reduce((s: number, d: any) => s + (d.mentions || 0), 0)
+        : undefined)
+
+    // Post-level aggregates if your API returns posts array
+    const posts: any[] = Array.isArray(analyticsData?.posts)
+      ? analyticsData.posts
+      : Array.isArray(analyticsData?.top_posts)
+      ? analyticsData.top_posts
+      : []
+
+    const postCount = posts.length || analyticsData?.post_count
+    const sum = (k: string) =>
+      posts.reduce((acc, p) => acc + (Number(p?.[k]) || 0), 0)
+
+    const totalLikes =
+      totalsObj.total_likes ?? (posts.length ? sum("likes") : undefined)
+    const totalReplies =
+      totalsObj.total_replies ?? (posts.length ? sum("replies") : undefined)
+    const totalReposts =
+      totalsObj.total_reposts ?? (posts.length ? sum("reposts") : undefined)
+    const totalEngagements =
+      Number(totalLikes || 0) +
+        Number(totalReplies || 0) +
+        Number(totalReposts || 0) || undefined
+
+    const impressions =
+      totalsObj.total_impressions ??
+      (posts.length ? sum("impressions") : undefined)
+
+    const totalFollowers =
+      totalsObj.total_followers ?? analyticsData?.total_followers
+
+    const linkClicks =
+      totalsObj.link_clicks ??
+      analyticsData?.link_clicks ??
+      (posts.length ? sum("link_clicks") : undefined)
+
+    // Engagement Rate per post: (likes + replies + reposts) / posts
+    const engagementRate =
+      postCount && Number(postCount) > 0
+        ? ((Number(totalEngagements || 0) / Number(postCount)) * 100).toFixed(2)
+        : undefined
+
+    // CTR from posts: clicks / impressions
+    const clickThroughRate =
+      impressions && impressions > 0
+        ? ((Number(linkClicks || 0) / impressions) * 100).toFixed(2)
+        : undefined
+
+    // Engagement-to-Follower Ratio: total engagements / followers
+    const engagementToFollowerRatio =
+      totalFollowers && totalFollowers > 0
+        ? ((Number(totalEngagements || 0) / totalFollowers) * 100).toFixed(2)
+        : undefined
+
+    // Follower growth delta over range
+    const followerGrowth = (() => {
+      if (!analyticsData?.followers_by_date) return undefined
+      const points = followerSeries
+      if (!points.length) return undefined
+      const first = points[0]?.followers
+      const last = points[points.length - 1]?.followers
+      if (
+        typeof first !== "number" ||
+        typeof last !== "number" ||
+        !Number.isFinite(first) ||
+        !Number.isFinite(last)
+      ) {
+        return undefined
+      }
+      return {
+        abs: last - first,
+        pct:
+          first > 0 ? (((last - first) / first) * 100).toFixed(2) : undefined,
+      }
+    })()
+
+    // Community growth signals – unique active engagers if provided
+    const activeEngagersUnique =
+      analyticsData?.active_engagers_unique ??
+      analyticsData?.engagers_unique_count ??
+      undefined
+
+    // Influential mentions count if provided
+    const influentialMentionsCount =
+      analyticsData?.influential_mentions_count ?? undefined
+
+    // Sentiment summary if provided
+    const sentiment = analyticsData?.sentiment ?? undefined
+
+    return {
+      totalMentions,
+      totalLikes,
+      totalReplies,
+      totalReposts,
+      totalEngagements,
+      postCount,
+      impressions,
+      linkClicks,
+      totalFollowers,
+      engagementRate,
+      clickThroughRate,
+      engagementToFollowerRatio,
+      followerGrowth,
+      activeEngagersUnique,
+      influentialMentionsCount,
+      sentiment,
+      postsForRanking: posts,
+    }
+  }, [analyticsData, mentionsSeries, followerSeries])
+
+  // Top Performing Posts (by engagement)
+  const topPosts = useMemo(() => {
+    const posts = totals.postsForRanking
+    if (!Array.isArray(posts) || posts.length === 0) return []
+    const withScore = posts.map((p: any) => ({
+      ...p,
+      engagement:
+        Number(p?.likes || 0) +
+        Number(p?.replies || 0) +
+        Number(p?.reposts || 0),
+    }))
+    return withScore
+      .sort((a: any, b: any) => b.engagement - a.engagement)
+      .slice(0, 10)
+  }, [totals.postsForRanking])
 
   const handleGenerate = async () => {
     if (!twitterId) {
@@ -107,10 +262,10 @@ const TwitterAnalytics = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          twitterId, // safe now
+          twitterId,
           tone,
           count,
-          analytics: analyticsData, // may be undefined if not loaded yet (OK if your API handles it)
+          analytics: analyticsData,
         }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -123,21 +278,18 @@ const TwitterAnalytics = () => {
       setIsGenerating(false)
     }
   }
+
   const openTwitterCompose = (
     text: string,
     opts?: { url?: string; hashtags?: string[]; via?: string }
   ) => {
-    // Trim to X's 280-char limit (basic safeguard; links count differently server-side)
     const safeText = text.length > 280 ? text.slice(0, 277) + "…" : text
-
     const u = new URL("https://twitter.com/intent/tweet")
     u.searchParams.set("text", safeText)
-
     if (opts?.url) u.searchParams.set("url", opts.url)
     if (opts?.via) u.searchParams.set("via", opts.via)
     if (opts?.hashtags?.length)
       u.searchParams.set("hashtags", opts.hashtags.join(","))
-
     window.open(u.toString(), "_blank", "noopener,noreferrer")
   }
 
@@ -202,91 +354,95 @@ const TwitterAnalytics = () => {
             </h1>
             <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
               <span className="bg-gray-800 rounded-full px-3 py-1">
-                {analyticsData?.date_range?.start_date} -{" "}
+                {analyticsData?.date_range?.start_date} —{" "}
                 {analyticsData?.date_range?.end_date}
               </span>
             </div>
           </header>
 
-          {/* Controls: Tweet generator (no mocks) */}
-          {/* <section className="bg-gray-800/60 border border-gray-700 rounded-2xl p-4 md:p-6 mb-8">
-            <div className="flex flex-col md:flex-row md:items-end gap-4 md:gap-6">
-              <div className="flex-1">
-                <label className="block text-sm text-gray-300 mb-2">
-                  Tone / Guidance (optional)
-                </label>
-                <textarea
-                  value={tone}
-                  onChange={(e) => setTone(e.target.value)}
-                  className="w-full bg-gray-900/70 border border-gray-700 rounded-xl p-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-600"
-                  rows={2}
-                  placeholder="Tell the generator how to sound (e.g., witty, professional, educational)…"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-300 mb-2">
-                  How many?
-                </label>
-                <select
-                  value={count}
-                  onChange={(e) => setCount(Number(e.target.value))}
-                  className="bg-gray-900/70 border border-gray-700 rounded-xl p-2 text-gray-100"
-                >
-                  {[3, 5, 8, 10].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-shrink-0">
-                <Button
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="w-full"
-                >
-                  {isGenerating ? "Generating…" : "Generate Buzz Tweets"}
-                </Button>
-              </div>
-            </div>
-          </section> */}
-
-          {/* Layout grid: charts + generated tweets sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left: Stats + Charts (span 2) */}
+            {/* Left: Stats + Charts */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Main Stats */}
+              {/* KPIs */}
               <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl transform transition-transform duration-300 hover:scale-105">
+                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
                   <h2 className="text-lg font-semibold text-gray-400">
-                    Total Mentions
+                    Mentions
                   </h2>
                   <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                    {analyticsData?.total_mentions?.toLocaleString?.() || "N/A"}
+                    {safeToLocale(totals.totalMentions)}
                   </p>
                 </div>
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl transform transition-transform duration-300 hover:scale-105">
+                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
                   <h2 className="text-lg font-semibold text-gray-400">
-                    Total Likes
+                    Engagement Rate
                   </h2>
                   <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                    {analyticsData?.total_likes?.toLocaleString?.() || "N/A"}
+                    {typeof totals.engagementRate === "string"
+                      ? `${totals.engagementRate}%`
+                      : "N/A"}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    ((likes+replies+reposts)/posts)
                   </p>
                 </div>
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl transform transition-transform duration-300 hover:scale-105">
+                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
                   <h2 className="text-lg font-semibold text-gray-400">
-                    Total Followers
+                    Follower Growth
+                  </h2>
+                  <p className="text-2xl md:text-3xl font-bold mt-2 text-gray-50">
+                    {totals.followerGrowth?.abs !== undefined
+                      ? `${
+                          totals.followerGrowth.abs >= 0 ? "+" : ""
+                        }${safeToLocale(totals.followerGrowth.abs)}`
+                      : "N/A"}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {totals.followerGrowth?.pct
+                      ? `${totals.followerGrowth.pct}%`
+                      : ""}
+                  </p>
+                </div>
+
+                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                  <h2 className="text-lg font-semibold text-gray-400">
+                    Click-through (Clicks)
                   </h2>
                   <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                    {analyticsData?.total_followers?.toLocaleString?.() ||
-                      "N/A"}
+                    {safeToLocale(totals.linkClicks)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {totals.clickThroughRate
+                      ? `CTR: ${totals.clickThroughRate}%`
+                      : "CTR: N/A"}
+                  </p>
+                </div>
+                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                  <h2 className="text-lg font-semibold text-gray-400">
+                    Engagement ÷ Followers
+                  </h2>
+                  <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
+                    {totals.engagementToFollowerRatio
+                      ? `${totals.engagementToFollowerRatio}%`
+                      : "N/A"}
+                  </p>
+                </div>
+                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                  <h2 className="text-lg font-semibold text-gray-400">
+                    Active Engagers
+                  </h2>
+                  <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
+                    {safeToLocale(totals.activeEngagersUnique)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Community growth signal
                   </p>
                 </div>
               </section>
-              {/* update */}
-              {/* Charts Section */}
+
+              {/* Charts */}
               <section className="grid grid-cols-1 gap-6">
-                {/* Mentions Over Time Chart (no mocked likes) */}
+                {/* Mentions Over Time */}
                 <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
                   <h2 className="text-xl font-semibold mb-4 text-gray-200">
                     Mentions Over Time
@@ -339,42 +495,217 @@ const TwitterAnalytics = () => {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Engagement Chart (uses backend engagement_by_type as-is) */}
-                <section className="bg-gray-800 rounded-2xl p-6 shadow-xl mb-2">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-200">
-                    Engagement Breakdown
+                {/* Follower Growth Over Time (renders only if series exists) */}
+                {followerSeries.length > 0 && (
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-xl font-semibold mb-4 text-gray-200">
+                      Followers Over Time
+                    </h2>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart
+                        data={followerSeries}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <XAxis
+                          dataKey="date"
+                          className="text-xs"
+                          stroke="#6b7280"
+                        />
+                        <YAxis className="text-xs" stroke="#6b7280" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                        <Legend
+                          verticalAlign="top"
+                          height={36}
+                          wrapperStyle={{ top: -20, left: 0 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="followers"
+                          stroke="#82ca9d"
+                          strokeWidth={3}
+                          dot={{ stroke: "#82ca9d", strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Engagement Breakdown (kept from your code, expects engagement_by_type) */}
+                {Array.isArray(analyticsData?.engagement_by_type) && (
+                  <section className="bg-gray-800 rounded-2xl p-6 shadow-xl mb-2">
+                    <h2 className="text-xl font-semibold mb-4 text-gray-200">
+                      Engagement Breakdown
+                    </h2>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart
+                        data={analyticsData?.engagement_by_type}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <XAxis
+                          dataKey="name"
+                          className="text-xs"
+                          stroke="#6b7280"
+                        />
+                        <YAxis className="text-xs" stroke="#6b7280" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                        <Legend
+                          verticalAlign="top"
+                          height={36}
+                          wrapperStyle={{ top: -20, left: 0 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#82ca9d"
+                          strokeWidth={3}
+                          dot={{ stroke: "#82ca9d", strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </section>
+                )}
+              </section>
+
+              {/* Top Performing Posts */}
+              <section className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">
+                  Top Performing Posts (by engagement)
+                </h2>
+                {topPosts.length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    No post data available.
+                  </p>
+                ) : (
+                  <div className="overflow-auto rounded-xl border border-gray-700">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-900/40">
+                        <tr>
+                          <th className="text-left px-4 py-3 font-semibold text-gray-300">
+                            Post
+                          </th>
+                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                            Engagement
+                          </th>
+                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                            Likes
+                          </th>
+                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                            Replies
+                          </th>
+                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                            Reposts
+                          </th>
+                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                            Impressions
+                          </th>
+                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                            Clicks
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {topPosts.map((p: any) => (
+                          <tr key={p.id} className="border-t border-gray-700">
+                            <td className="px-4 py-3 max-w-[360px]">
+                              {p.url ? (
+                                <a
+                                  href={p.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-indigo-300 hover:text-indigo-200 underline"
+                                >
+                                  {p.text?.slice(0, 120) || "View post"}
+                                  {p.text?.length > 120 ? "…" : ""}
+                                </a>
+                              ) : (
+                                <span className="text-gray-200">
+                                  {p.text?.slice(0, 120) || "—"}
+                                  {p.text?.length > 120 ? "…" : ""}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {safeToLocale(p.engagement)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {safeToLocale(p.likes)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {safeToLocale(p.replies)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {safeToLocale(p.reposts)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {safeToLocale(p.impressions)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {safeToLocale(p.link_clicks)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+
+              {/* Influential Mentions / Sentiment (TBD-aware) */}
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                  <h2 className="text-xl font-semibold mb-2 text-gray-200">
+                    Influential Mentions
                   </h2>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart
-                      data={analyticsData?.engagement_by_type}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <XAxis
-                        dataKey="name"
-                        className="text-xs"
-                        stroke="#6b7280"
-                      />
-                      <YAxis className="text-xs" stroke="#6b7280" />
-                      <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                      <Legend
-                        verticalAlign="top"
-                        height={36}
-                        wrapperStyle={{ top: -20, left: 0 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#82ca9d"
-                        strokeWidth={3}
-                        dot={{ stroke: "#82ca9d", strokeWidth: 2 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </section>
+                  {typeof totals.influentialMentionsCount === "number" ? (
+                    <p className="text-4xl font-bold text-gray-50">
+                      {totals.influentialMentionsCount.toLocaleString()}
+                    </p>
+                  ) : (
+                    <p className="text-gray-400">Coming soon</p>
+                  )}
+                </div>
+                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                  <h2 className="text-xl font-semibold mb-2 text-gray-200">
+                    Sentiment Analysis
+                  </h2>
+                  {totals.sentiment ? (
+                    <div className="text-sm text-gray-300 space-y-1">
+                      {"positive" in totals.sentiment && (
+                        <div>
+                          Positive:{" "}
+                          {percent(
+                            totals.sentiment.positive,
+                            totals.sentiment.total
+                          )}
+                        </div>
+                      )}
+                      {"neutral" in totals.sentiment && (
+                        <div>
+                          Neutral:{" "}
+                          {percent(
+                            totals.sentiment.neutral,
+                            totals.sentiment.total
+                          )}
+                        </div>
+                      )}
+                      {"negative" in totals.sentiment && (
+                        <div>
+                          Negative:{" "}
+                          {percent(
+                            totals.sentiment.negative,
+                            totals.sentiment.total
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400">Coming soon</p>
+                  )}
+                </div>
               </section>
             </div>
 
-            {/* Right: Generated Tweets (from backend only) */}
+            {/* Right: Generated Tweets */}
             <aside className="lg:col-span-1 bg-gray-800 rounded-2xl p-4 md:p-6 shadow-xl h-fit sticky top-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-200">
@@ -391,10 +722,8 @@ const TwitterAnalytics = () => {
 
               {tweetIdeas.length === 0 ? (
                 <p className="text-gray-400 text-sm">
-                  Use{" "}
-                  <span className="font-semibold">Generate Buzz Tweets</span> to
-                  fetch ideas from your backend. Each item can include
-                  server-calculated estimates for mentions, likes, and retweets.
+                  Use <span className="font-semibold">Generate</span> to fetch
+                  ideas from your backend.
                 </p>
               ) : (
                 <ul className="space-y-4">
@@ -461,7 +790,7 @@ const TwitterAnalytics = () => {
         </div>
       )}
 
-      {/* The Modal Component remains the same, used by both buttons */}
+      {/* Modal */}
       <Modal open={isModalOpen} onClose={handleCloseModal}>
         <MultiStepForm onClose={handleCloseModal} />
       </Modal>
