@@ -1,5 +1,10 @@
-// app/ai-analytics/page.tsx
+// app/admin/dashboard/ai-analytics/page.tsx
 "use client"
+
+import * as React from "react"
+import { Suspense } from "react"
+import { useSelector } from "react-redux"
+import { useSearchParams } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,9 +18,6 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Eye, Loader2, Sparkles, Target, Users } from "lucide-react"
-import { useSearchParams } from "next/navigation"
-import * as React from "react"
-import { useSelector } from "react-redux"
 import {
   CartesianGrid,
   Line,
@@ -26,47 +28,65 @@ import {
   YAxis,
 } from "recharts"
 
-// Fallback lightweight helpers so this page works standalone
-function toSeries(
-  arr: Array<{ date: string; clicks?: number; views?: number }>
-) {
-  return (arr || [])
-    .map(({ date, clicks, views }) => ({
-      date,
-      value: Number(clicks ?? views ?? 0),
-    }))
-    .sort((a, b) => {
-      const [am, ad] = a.date.split("/").map(Number)
-      const [bm, bd] = b.date.split("/").map(Number)
-      if (am === bm) return ad - bd
-      return am - bm
-    })
+// ---------- Suspense wrapper page ----------
+export default function Page() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 text-sm text-muted-foreground">
+          Loading analytics…
+        </div>
+      }
+    >
+      <AIAnalyticsClient />
+    </Suspense>
+  )
 }
 
-function summarize(series: Array<{ value: number }>) {
-  const values = series.map((d) => d.value)
-  const total = values.reduce((a, b) => a + b, 0)
-  const avg = values.length ? total / values.length : 0
-  const last = values.at(-1) ?? 0
-  const max = Math.max(...values, 0)
-  const min = Math.min(...values, 0)
-  const trend =
-    values.length >= 2 ? (last - values[0]) / Math.max(values[0], 1) : 0
-  return { total, avg, last, max, min, trend }
-}
+// ---------- Your original client logic moved here ----------
+function AIAnalyticsClient() {
+  const searchParams = useSearchParams()
 
-function buildGrowthPrompt(input: any) {
-  const clicksSeries = input.datasets?.clicks
-    ? toSeries(input.datasets.clicks)
-    : null
-  const pageViewsSeries = input.datasets?.pageViews
-    ? toSeries(input.datasets.pageViews)
-    : null
-  const clicksStats = clicksSeries ? summarize(clicksSeries) : null
-  // ✅ fix typo here
-  const pvStats = pageViewsSeries ? summarize(pageViewsSeries) : null
+  // Fallback lightweight helpers
+  function toSeries(
+    arr: Array<{ date: string; clicks?: number; views?: number }>
+  ) {
+    return (arr || [])
+      .map(({ date, clicks, views }) => ({
+        date,
+        value: Number(clicks ?? views ?? 0),
+      }))
+      .sort((a, b) => {
+        const [am, ad] = a.date.split("/").map(Number)
+        const [bm, bd] = b.date.split("/").map(Number)
+        if (am === bm) return ad - bd
+        return am - bm
+      })
+  }
 
-  return `
+  function summarize(series: Array<{ value: number }>) {
+    const values = series.map((d) => d.value)
+    const total = values.reduce((a, b) => a + b, 0)
+    const avg = values.length ? total / values.length : 0
+    const last = values.at(-1) ?? 0
+    const max = Math.max(...values, 0)
+    const min = Math.min(...values, 0)
+    const trend =
+      values.length >= 2 ? (last - values[0]) / Math.max(values[0], 1) : 0
+    return { total, avg, last, max, min, trend }
+  }
+
+  function buildGrowthPrompt(input: any) {
+    const clicksSeries = input.datasets?.clicks
+      ? toSeries(input.datasets.clicks)
+      : null
+    const pageViewsSeries = input.datasets?.pageViews
+      ? toSeries(input.datasets.pageViews)
+      : null
+    const clicksStats = clicksSeries ? summarize(clicksSeries) : null
+    const pvStats = pageViewsSeries ? summarize(pageViewsSeries) : null
+
+    return `
 You are a growth analyst. Based on the telemetry, produce concrete, prioritized growth suggestions.
 - Output: 5–8 bullet points. Each: [Insight] + [Action] + [Expected impact].
 - Optimize for small startup constraints (low eng lift where possible).
@@ -74,8 +94,8 @@ You are a growth analyst. Based on the telemetry, produce concrete, prioritized 
 Context:
 - Company: ${input.companyId || "N/A"}
 - Timeframe: ${input.timeRange?.startDate || "?"} to ${
-    input.timeRange?.endDate || "now"
-  }
+      input.timeRange?.endDate || "now"
+    }
 - Filters: ${JSON.stringify(input.filters || {})}
 
 ${
@@ -111,36 +131,19 @@ ${input.datasets.usersPerDay.users_per_day
     : "Users Per Day: none"
 }
   `.trim()
-}
+  }
 
-// UI helpers
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex flex-col">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-base font-medium">{value}</span>
-    </div>
-  )
-}
-
-export default function AIAnalyticsPage() {
-  const searchParams = useSearchParams()
-
-  // ✅ Read payload from Redux (abalyticsData slice), else fall back to localStorage
+  // ✅ payload from Redux (abalyticsData slice) or localStorage
   const reduxPayload = useSelector(
     (state: any) => state?.abalyticsData?.payload
   )
-
   const [lsPayload, setLsPayload] = React.useState<any>(null)
   React.useEffect(() => {
     try {
       const raw = localStorage.getItem("ai_analytics_payload")
       if (raw) setLsPayload(JSON.parse(raw))
-    } catch (e) {
-      console.warn("No localStorage ai_analytics_payload", e)
-    }
+    } catch {}
   }, [])
-
   const payload = reduxPayload || lsPayload || {}
 
   const selectedKeys = React.useMemo(() => {
@@ -158,9 +161,7 @@ export default function AIAnalyticsPage() {
   async function generateSuggestions() {
     setLoading(true)
     setSuggestions("")
-
     const prompt = buildGrowthPrompt({ ...payload, notes: extraNotes })
-
     try {
       const res = await fetch("/api/growth-suggestions", {
         method: "POST",
@@ -178,7 +179,6 @@ export default function AIAnalyticsPage() {
   }
 
   const ds = payload.datasets || {}
-
   const tiles: Array<{
     key: string
     title: string
@@ -202,6 +202,7 @@ export default function AIAnalyticsPage() {
     },
   ]
 
+  // ----- UI -----
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       <div className="flex items-start justify-between gap-4">
@@ -217,7 +218,6 @@ export default function AIAnalyticsPage() {
         <Badge variant="secondary">Company: {payload.companyId || "N/A"}</Badge>
       </div>
 
-      {/* Time & filters context */}
       <Card>
         <CardHeader>
           <CardTitle>Context</CardTitle>
@@ -243,7 +243,6 @@ export default function AIAnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Charts for selected tiles */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {tiles
           .filter(
@@ -286,7 +285,6 @@ export default function AIAnalyticsPage() {
           })}
       </div>
 
-      {/* Users Per Day table (optional) */}
       {selectedKeys.includes("usersPerDay") &&
       payload.datasets?.usersPerDay?.users_per_day?.length ? (
         <Card>
@@ -317,7 +315,6 @@ export default function AIAnalyticsPage() {
 
       <Separator />
 
-      {/* Growth suggestions */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -358,7 +355,6 @@ export default function AIAnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Raw Events (optional peek) */}
       {selectedKeys.includes("rawEvents") &&
       Array.isArray(ds.rawEvents) &&
       ds.rawEvents.length ? (
@@ -404,6 +400,16 @@ export default function AIAnalyticsPage() {
           </CardContent>
         </Card>
       ) : null}
+    </div>
+  )
+}
+
+// UI helper
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-base font-medium">{value}</span>
     </div>
   )
 }

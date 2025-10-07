@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server"
 import OpenAI from "openai"
 
-export const runtime = "nodejs" as const
+export const runtime = "nodejs"
 
 type ReqBody = { prompt?: string }
 
