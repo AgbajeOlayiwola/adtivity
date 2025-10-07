@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Sparkles, TrendingUp } from "lucide-react"
+import { Loader2, TrendingUp } from "lucide-react"
 import {
   CartesianGrid,
   Line,
@@ -26,9 +26,17 @@ import {
   YAxis,
 } from "recharts"
 
-// ---------- Helpers ----------
+// ---------- Types ----------
 type Point = { date: string; value: number }
+type ProjectionPoint = {
+  date: string
+  baseline?: number | null
+  low?: number | null
+  mean?: number | null
+  high?: number | null
+}
 
+// ---------- Helpers ----------
 function toSeries(
   arr: Array<{ date: string; clicks?: number; views?: number }>
 ): Point[] {
@@ -60,12 +68,31 @@ function summarize(series: Array<{ value: number }>) {
   return { total, avg, last, max, min, trend }
 }
 
-// Parse "[Expected impact] +5–12%" or "+7-15%" or "+10%" → {min, max, mean}
+// Pearson correlation (for relations)
+function correlation(a: Point[], b: Point[]) {
+  // align by date
+  const mapB = new Map(b.map((p) => [p.date, p.value]))
+  const pairs: Array<[number, number]> = a
+    .filter((p) => mapB.has(p.date))
+    .map((p) => [p.value, mapB.get(p.date)!])
+
+  if (pairs.length < 2) return NaN
+  const xs = pairs.map((p) => p[0])
+  const ys = pairs.map((p) => p[1])
+  const mean = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / arr.length
+  const mx = mean(xs),
+    my = mean(ys)
+  const num = pairs.reduce((s, [x, y]) => s + (x - mx) * (y - my), 0)
+  const denX = Math.sqrt(xs.reduce((s, x) => s + Math.pow(x - mx, 2), 0))
+  const denY = Math.sqrt(ys.reduce((s, y) => s + Math.pow(y - my, 2), 0))
+  return denX && denY ? num / (denX * denY) : NaN
+}
+
+// Parse "[Expected impact] +5–12%" or "+7-15%" or "+10%"
 function parseImpactRange(
   text: string
 ): { min: number; max: number; mean: number } | null {
   if (!text) return null
-  // capture +5–12% / +5-12% / 5–12% / 10%
   const re = /([+−-]?\s*\d+(?:\.\d+)?)\s*(?:[–-]\s*(\d+(?:\.\d+)?))?\s*%/g
   let m: RegExpExecArray | null
   const ranges: Array<{ min: number; max: number }> = []
@@ -103,14 +130,7 @@ function addDays(d: Date, n: number) {
   return x
 }
 
-// Build a simple 14-day projection using last 7-day avg as baseline
-type ProjectionPoint = {
-  date: string
-  baseline?: number | null
-  low?: number | null
-  mean?: number | null
-  high?: number | null
-}
+// 14-day projection using last 7-day avg as baseline
 function buildProjection(
   series: Point[],
   liftPct: { min: number; max: number; mean: number } | null,
@@ -152,6 +172,10 @@ function buildGrowthPrompt(input: any) {
   const clicksStats = clicksSeries ? summarize(clicksSeries) : null
   const pvStats = pageViewsSeries ? summarize(pageViewsSeries) : null
 
+  const activeFilters = input.activeFilters
+    ? JSON.stringify(input.activeFilters)
+    : "{}"
+
   return `
 You are a growth analyst. Based on the telemetry, produce concrete, prioritized growth suggestions.
 - Output: 5–8 bullet points. Each: [Insight] + [Action] + [Expected impact].
@@ -163,6 +187,7 @@ Context:
     input.timeRange?.endDate || "now"
   }
 - Filters: ${JSON.stringify(input.filters || {})}
+- AI Filters (user-selected): ${activeFilters}
 - Extra notes from user: ${input.notes || "-"}
 
 ${
@@ -193,7 +218,7 @@ Summary: total=${pvStats!.total}, avg=${pvStats!.avg.toFixed(2)}, last=${
 
 // ---------- Page ----------
 export default function Page() {
-  // Pull payload from Redux; fallback to localStorage
+  // payload from Redux; fallback to localStorage
   const reduxPayload = useSelector(
     (state: any) => state?.abalyticsData?.payload
   )
@@ -205,7 +230,109 @@ export default function Page() {
     } catch {}
   }, [])
   const payload = reduxPayload || lsPayload || {}
+  const ds = payload.datasets || {}
 
+  // ----- AI Filters state -----
+  const initialSelected = (payload.selected || []) as string[]
+  const [includeClicks, setIncludeClicks] = React.useState(
+    initialSelected.includes("clicks")
+  )
+  const [includePageViews, setIncludePageViews] = React.useState(
+    initialSelected.includes("pageViews")
+  )
+  const [includeUsers, setIncludeUsers] = React.useState(
+    initialSelected.includes("usersPerDay")
+  )
+  const [alignDates, setAlignDates] = React.useState(true)
+  const allDates = React.useMemo(() => {
+    const set = new Set<string>()
+    ;(ds.clicks || []).forEach((d: any) => set.add(d.date))
+    ;(ds.pageViews || []).forEach((d: any) => set.add(d.date))
+    return Array.from(set).sort((a, b) => {
+      const [am, ad] = a.split("/").map(Number)
+      const [bm, bd] = b.split("/").map(Number)
+      return am === bm ? ad - bd : am - bm
+    })
+  }, [ds.clicks, ds.pageViews])
+  const [selectedDates, setSelectedDates] = React.useState<string[]>([])
+
+  // Optional context filters from raw data
+  const rawEvents: any[] = Array.isArray(ds.rawEvents) ? ds.rawEvents : []
+  const regional: any[] = Array.isArray(ds.regional)
+    ? ds.regional
+    : payload.datasets?.regional || []
+
+  const uniqueButtons = React.useMemo(() => {
+    const s = new Set<string>()
+    rawEvents.forEach((e: any) => {
+      const n = e?.event_name
+      if (typeof n === "string" && n.startsWith("Button:")) s.add(n)
+    })
+    return Array.from(s).sort()
+  }, [rawEvents])
+
+  const uniquePages = React.useMemo(() => {
+    const s = new Set<string>()
+    rawEvents.forEach((e: any) => {
+      const p = e?.properties?.path
+      if (p) s.add(p)
+    })
+    return Array.from(s).sort()
+  }, [rawEvents])
+
+  const uniqueCountries = React.useMemo(() => {
+    const s = new Set<string>()
+    regional.forEach((r: any) => {
+      const c = r?.country || r?.code || r?.name
+      if (c) s.add(c)
+    })
+    return Array.from(s).sort()
+  }, [regional])
+
+  const [selectedButtons, setSelectedButtons] = React.useState<string[]>([])
+  const [selectedPages, setSelectedPages] = React.useState<string[]>([])
+  const [selectedCountries, setSelectedCountries] = React.useState<string[]>([])
+
+  // ----- Derived datasets based on filters -----
+  function applyFiltersToSeries(series: Point[]): Point[] {
+    let out = series
+    if (selectedDates.length) {
+      const set = new Set(selectedDates)
+      out = out.filter((p) => set.has(p.date))
+    }
+    return out
+  }
+
+  function alignSeries(a: Point[], b: Point[]): [Point[], Point[]] {
+    if (!alignDates) return [a, b]
+    const inter = new Set(
+      a.map((p) => p.date).filter((d) => b.some((q) => q.date === d))
+    )
+    return [
+      a.filter((p) => inter.has(p.date)),
+      b.filter((p) => inter.has(p.date)),
+    ]
+  }
+
+  const clicksSeries = includeClicks
+    ? applyFiltersToSeries(toSeries(ds.clicks || []))
+    : []
+  const pageViewsSeries = includePageViews
+    ? applyFiltersToSeries(toSeries(ds.pageViews || []))
+    : []
+
+  const [clicksAligned, pageViewsAligned] = React.useMemo(
+    () => alignSeries(clicksSeries, pageViewsSeries),
+    [clicksSeries, pageViewsSeries, alignDates]
+  )
+
+  // Correlation for relations
+  const corr = React.useMemo(() => {
+    if (!includeClicks || !includePageViews) return NaN
+    return correlation(clicksAligned, pageViewsAligned)
+  }, [includeClicks, includePageViews, clicksAligned, pageViewsAligned])
+
+  // ----- Suggestions + projections -----
   const [extraNotes, setExtraNotes] = React.useState("")
   const [suggestions, setSuggestions] = React.useState<string>("")
   const [impact, setImpact] = React.useState<{
@@ -217,16 +344,38 @@ export default function Page() {
   const [projViews, setProjViews] = React.useState<ProjectionPoint[]>([])
   const [loading, setLoading] = React.useState(false)
 
-  async function generateSuggestions(auto = false) {
-    if (auto && suggestions) return
+  const activeAIFilters = React.useMemo(
+    () => ({
+      include: {
+        clicks: includeClicks,
+        pageViews: includePageViews,
+        usersPerDay: includeUsers,
+      },
+      alignDates,
+      selectedDates,
+      selectedButtons,
+      selectedPages,
+      selectedCountries,
+    }),
+    [
+      includeClicks,
+      includePageViews,
+      includeUsers,
+      alignDates,
+      selectedDates,
+      selectedButtons,
+      selectedPages,
+      selectedCountries,
+    ]
+  )
+
+  async function generate(promptPayload: any) {
     setLoading(true)
-    if (!auto) setSuggestions("")
-    const prompt = buildGrowthPrompt({ ...payload, notes: extraNotes })
     try {
       const res = await fetch("/api/growth-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt: buildGrowthPrompt(promptPayload) }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Failed")
@@ -238,33 +387,85 @@ export default function Page() {
     }
   }
 
-  // Auto-generate once payload is available
+  // Build prompt payload from current filters
+  function makePromptInput() {
+    const selectedDatasets: any = {}
+    if (includeClicks) selectedDatasets.clicks = ds.clicks
+    if (includePageViews) selectedDatasets.pageViews = ds.pageViews
+    if (includeUsers) selectedDatasets.usersPerDay = ds.usersPerDay
+
+    // Limit by selected dates for clicks/pageViews
+    if (selectedDatasets.clicks && selectedDates.length) {
+      const set = new Set(selectedDates)
+      selectedDatasets.clicks = (selectedDatasets.clicks as any[]).filter((d) =>
+        set.has(d.date)
+      )
+    }
+    if (selectedDatasets.pageViews && selectedDates.length) {
+      const set = new Set(selectedDates)
+      selectedDatasets.pageViews = (selectedDatasets.pageViews as any[]).filter(
+        (d) => set.has(d.date)
+      )
+    }
+
+    // Context-only filters (affect AI reasoning)
+    const contextFilters = {
+      selectedButtons,
+      selectedPages,
+      selectedCountries,
+    }
+
+    return {
+      companyId: payload.companyId ?? null,
+      timeRange: payload.timeRange ?? { startDate: null, endDate: null },
+      filters: payload.filters ?? {},
+      datasets: selectedDatasets,
+      activeFilters: { ...activeAIFilters, context: contextFilters },
+      notes: extraNotes,
+    }
+  }
+
+  // Auto-generate on page load (once payload is available)
   React.useEffect(() => {
     if (payload && (payload.datasets || payload.selected)) {
-      generateSuggestions(true)
+      generate(makePromptInput())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!payload])
 
-  // Recompute projections when suggestions or datasets change
+  // Regenerate when AI filters change
+  React.useEffect(() => {
+    if (!payload) return
+    generate(makePromptInput())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    includeClicks,
+    includePageViews,
+    includeUsers,
+    alignDates,
+    selectedDates,
+    selectedButtons,
+    selectedPages,
+    selectedCountries,
+  ])
+
+  // Recompute projections when suggestions or filtered series change
   React.useEffect(() => {
     const parsed = parseImpactRange(suggestions || "")
     setImpact(parsed)
-
-    const clicksSeries = payload.datasets?.clicks
-      ? toSeries(payload.datasets.clicks)
-      : []
-    const pageViewsSeries = payload.datasets?.pageViews
-      ? toSeries(payload.datasets.pageViews)
-      : []
-
     setProjClicks(
-      clicksSeries.length ? buildProjection(clicksSeries, parsed, 14) : []
+      includeClicks ? buildProjection(clicksAligned, parsed, 14) : []
     )
     setProjViews(
-      pageViewsSeries.length ? buildProjection(pageViewsSeries, parsed, 14) : []
+      includePageViews ? buildProjection(pageViewsAligned, parsed, 14) : []
     )
-  }, [suggestions, payload.datasets])
+  }, [
+    suggestions,
+    clicksAligned,
+    pageViewsAligned,
+    includeClicks,
+    includePageViews,
+  ])
 
   const ImpactBadge = () =>
     impact ? (
@@ -303,14 +504,12 @@ export default function Page() {
               <XAxis dataKey="date" />
               <YAxis />
               <RechartsTooltip />
-              {/* Baseline (past) */}
               <Line
                 type="monotone"
                 dataKey="baseline"
                 strokeWidth={2}
                 dot={false}
               />
-              {/* Projections (future) */}
               <Line type="monotone" dataKey="low" strokeWidth={2} dot={false} />
               <Line
                 type="monotone"
@@ -335,69 +534,318 @@ export default function Page() {
     )
   }
 
+  // ----- UI -----
+  const corrLabel = Number.isNaN(corr) ? "n/a" : corr.toFixed(2)
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
             AI Growth Suggestions & Projections
           </h1>
           <p className="text-muted-foreground">
-            We summarize your datasets, generate insights, then chart potential
-            growth based on the AI’s expected impact.
+            We analyze your selected datasets, generate insights, and chart
+            potential growth. Adjust filters to explore relations— suggestions
+            regenerate automatically.
           </p>
         </div>
-        <Badge variant="secondary">Company: {payload.companyId || "N/A"}</Badge>
+        <div className="flex flex-col items-end gap-2">
+          <Badge variant="secondary">
+            Company: {payload.companyId || "N/A"}
+          </Badge>
+          <Badge variant="outline">Clicks↔Views corr: {corrLabel}</Badge>
+        </div>
       </div>
 
+      {/* AI Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" /> Suggestions
-          </CardTitle>
+          <CardTitle>AI Filters</CardTitle>
           <CardDescription>
-            Add optional context and regenerate if needed.
+            Choose datasets and context to guide the AI and projections.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Textarea
-            placeholder='Optional notes — e.g. "Primary KPI is free-to-paid conversion", "New hero launched 09/28".'
-            value={extraNotes}
-            onChange={(e) => setExtraNotes(e.target.value)}
-          />
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={() => generateSuggestions(false)}
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating…
-                </>
-              ) : (
-                "Generate / Regenerate"
-              )}
-            </Button>
-            <ImpactBadge />
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Datasets</div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={includeClicks}
+                  onChange={(e) => setIncludeClicks(e.target.checked)}
+                />
+                Clicks
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={includePageViews}
+                  onChange={(e) => setIncludePageViews(e.target.checked)}
+                />
+                Page Views
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={includeUsers}
+                  onChange={(e) => setIncludeUsers(e.target.checked)}
+                />
+                Users Per Day
+              </label>
+
+              <label className="flex items-center gap-2 text-sm mt-3">
+                <input
+                  type="checkbox"
+                  checked={alignDates}
+                  onChange={(e) => setAlignDates(e.target.checked)}
+                />
+                Align dates across datasets
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Dates</div>
+              <div className="text-xs text-muted-foreground">
+                Filter by specific dates (optional)
+              </div>
+              <div className="max-h-32 overflow-auto rounded border p-2 space-y-1">
+                {allDates.map((d) => (
+                  <label key={d} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selectedDates.includes(d)}
+                      onChange={(e) =>
+                        setSelectedDates((prev) =>
+                          e.target.checked
+                            ? [...prev, d]
+                            : prev.filter((x) => x !== d)
+                        )
+                      }
+                    />
+                    {d}
+                  </label>
+                ))}
+                {!allDates.length && (
+                  <div className="text-xs text-muted-foreground">No dates</div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Context filters</div>
+              <div className="text-xs text-muted-foreground">
+                These don’t slice aggregates but guide the AI.
+              </div>
+
+              {/* Buttons */}
+              <div className="text-xs mt-1">Buttons</div>
+              <div className="max-h-16 overflow-auto rounded border p-2 space-y-1">
+                {uniqueButtons.length ? (
+                  uniqueButtons.map((b) => (
+                    <label key={b} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedButtons.includes(b)}
+                        onChange={(e) =>
+                          setSelectedButtons((prev) =>
+                            e.target.checked
+                              ? [...prev, b]
+                              : prev.filter((x) => x !== b)
+                          )
+                        }
+                      />
+                      {b}
+                    </label>
+                  ))
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    No button data
+                  </div>
+                )}
+              </div>
+
+              {/* Pages */}
+              <div className="text-xs mt-2">Pages</div>
+              <div className="max-h-16 overflow-auto rounded border p-2 space-y-1">
+                {uniquePages.length ? (
+                  uniquePages.map((p) => (
+                    <label key={p} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedPages.includes(p)}
+                        onChange={(e) =>
+                          setSelectedPages((prev) =>
+                            e.target.checked
+                              ? [...prev, p]
+                              : prev.filter((x) => x !== p)
+                          )
+                        }
+                      />
+                      {p}
+                    </label>
+                  ))
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    No page data
+                  </div>
+                )}
+              </div>
+
+              {/* Countries */}
+              <div className="text-xs mt-2">Countries</div>
+              <div className="max-h-16 overflow-auto rounded border p-2 space-y-1">
+                {uniqueCountries.length ? (
+                  uniqueCountries.map((c) => (
+                    <label key={c} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedCountries.includes(c)}
+                        onChange={(e) =>
+                          setSelectedCountries((prev) =>
+                            e.target.checked
+                              ? [...prev, c]
+                              : prev.filter((x) => x !== c)
+                          )
+                        }
+                      />
+                      {c}
+                    </label>
+                  ))
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    No regional data
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Extra notes</div>
+            <Textarea
+              placeholder="Optional — e.g. “Primary KPI is trials → paid”, “Mobile hero A/B launching next week”."
+              value={extraNotes}
+              onChange={(e) => setExtraNotes(e.target.value)}
+            />
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => generate(makePromptInput())}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  "Generate / Regenerate"
+                )}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Suggestions also regenerate automatically when filters change.
+              </span>
+            </div>
           </div>
 
           <Separator />
 
           <div className="rounded-md border p-4 whitespace-pre-wrap text-sm min-h-[120px]">
-            {suggestions || "No suggestions yet."}
+            {suggestions || (loading ? "Generating…" : "No suggestions yet.")}
           </div>
         </CardContent>
       </Card>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <ChartBlock title="Projected Clicks (next 14 days)" data={projClicks} />
-        <ChartBlock
-          title="Projected Page Views (next 14 days)"
-          data={projViews}
-        />
+        {includeClicks ? (
+          <ChartCard
+            title="Projected Clicks (next 14 days)"
+            data={projClicks}
+            ImpactBadge={<ImpactBadge impact={impact} />}
+          />
+        ) : null}
+        {includePageViews ? (
+          <ChartCard
+            title="Projected Page Views (next 14 days)"
+            data={projViews}
+            ImpactBadge={<ImpactBadge impact={impact} />}
+          />
+        ) : null}
       </div>
     </div>
+  )
+}
+
+// Small components
+function ImpactBadge({
+  impact,
+}: {
+  impact: { min: number; max: number; mean: number } | null
+}) {
+  return impact ? (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Badge variant="outline">
+        Expected impact (avg): {impact.mean.toFixed(1)}%
+      </Badge>
+      <Badge variant="secondary">
+        Range: {impact.min.toFixed(1)}% – {impact.max.toFixed(1)}%
+      </Badge>
+    </div>
+  ) : (
+    <Badge variant="outline">Expected impact: n/a</Badge>
+  )
+}
+
+function ChartCard({
+  title,
+  data,
+  ImpactBadge,
+}: {
+  title: string
+  data: ProjectionPoint[]
+  ImpactBadge: React.ReactNode
+}) {
+  if (!data.length) return null
+  return (
+    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+      <CardHeader className="flex items-center justify-between gap-2 sm:flex-row sm:items-center">
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" /> {title}
+        </CardTitle>
+        {ImpactBadge}
+      </CardHeader>
+      <CardContent className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <RechartsTooltip />
+            <Line
+              type="monotone"
+              dataKey="baseline"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line type="monotone" dataKey="low" strokeWidth={2} dot={false} />
+            <Line
+              type="monotone"
+              dataKey="mean"
+              strokeWidth={3}
+              dot={{ r: 2 }}
+            />
+            <Line type="monotone" dataKey="high" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+        <div className="text-[10px] text-muted-foreground mt-2">
+          Baseline shows recent history; projections show next 14 days using the
+          AI’s expected impact.
+        </div>
+      </CardContent>
+    </Card>
   )
 }
