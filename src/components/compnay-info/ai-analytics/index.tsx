@@ -216,6 +216,7 @@ export default function AIAnalytics({
     }).toString()
 
     // window.open(`${analyticsPath}?${qs}`)
+    navigate.push(`/admin/dashboard/ai-analytics`)
   }
 
   return (

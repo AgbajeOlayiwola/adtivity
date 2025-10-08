@@ -633,7 +633,6 @@ export default function KpiDashboardPage() {
                 "clicks",
                 "usersPerDay",
                 "regional",
-                "web3Events",
                 "wallets",
                 "rawEvents",
               ]}

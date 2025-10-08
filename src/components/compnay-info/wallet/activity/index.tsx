@@ -1,9 +1,11 @@
+// components/wallets/WalletActivityModal.tsx
 "use client"
 
 import { PublicKey } from "@solana/web3.js"
 import { format, formatDistanceToNow } from "date-fns"
+import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { useSelector } from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,6 +16,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -30,10 +40,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { X } from "lucide-react"
+import { ChevronDown, X } from "lucide-react"
 
 // ✅ Growth image component
 import GrowthImage from "@/components/compnay-info/growth-image"
+import { setAnalyticsData } from "@/redux/slices/abalyticsDataSlice"
 
 // ------------------------------------------------------------
 // Types
@@ -261,7 +272,8 @@ export default function WalletActivityModal({
   onVerified?: () => void
 }) {
   const { token }: any = useSelector((store) => store)
-
+  const router = useRouter()
+  const dispatch = useDispatch()
   // Verify state
   const [busy, setBusy] = useState(false)
   const [errorText, setErrorText] = useState<string | null>(null)
@@ -294,7 +306,7 @@ export default function WalletActivityModal({
   const [activityLoading, setActivityLoading] = useState(false)
   const [activityError, setActivityError] = useState<string | null>(null)
 
-  // Optional timeframe
+  // Optional timeframe (used for AI payload too)
   const [startDate, setStartDate] = useState<string | undefined>(undefined)
   const [endDate, setEndDate] = useState<string | undefined>(undefined)
 
@@ -606,8 +618,86 @@ export default function WalletActivityModal({
     }
   }, [counterpartyAggs])
 
-  // ===================== NEW: Web3 events for GrowthImage =====================
-  // ✅ Keep this ABOVE the guard so Hooks order never changes
+  // ===================== NEW: AI Analytics dropdown state =====================
+  type AiKey = "web3Events" | "rawEvents" | "wallets"
+  const [aiMenuOpen, setAiMenuOpen] = useState(false)
+  const [aiSelection, setAiSelection] = useState<Record<AiKey, boolean>>({
+    web3Events: true,
+    rawEvents: false,
+    wallets: false,
+  })
+  const hasAnyAi = Object.values(aiSelection).some(Boolean)
+
+  const toggleAi = (k: AiKey) => setAiSelection((p) => ({ ...p, [k]: !p[k] }))
+
+  // Keep menu open after clicking items; only close on outside/Esc
+  const handleStick = (k: AiKey) => {
+    toggleAi(k)
+    requestAnimationFrame(() => setAiMenuOpen(true))
+  }
+
+  // Helper to reduce undefined
+  const compact = (obj: Record<string, any>) =>
+    Object.fromEntries(Object.entries(obj).filter(([, v]) => v != null))
+
+  // Map activities to a generic web3 event shape
+  const web3Events = useMemo(
+    () =>
+      (activities || []).map((tx) => ({
+        event_name: tx.transaction_type || "onchain_activity",
+        timestamp: tx.timestamp,
+        tx_hash: tx.transaction_hash,
+        network: tx.network,
+        amount_usd: tx.amount_usd,
+      })),
+    [activities]
+  )
+
+  // Build and open AI payload
+  const openAIAnalytics = () => {
+    if (!wallet) return
+    const selected: AiKey[] = Object.entries(aiSelection)
+      .filter(([, v]) => v)
+      .map(([k]) => k) as AiKey[]
+
+    const payload = {
+      companyId: wallet.company_id ?? null,
+      timeRange: {
+        startDate: startDate ?? null,
+        endDate: endDate ?? null,
+      },
+      filters: {
+        selectedWallet: wallet.wallet_address,
+        selectedNetwork: wallet.network,
+      },
+      selected,
+      datasets: compact({
+        web3Events: aiSelection.web3Events ? web3Events : undefined,
+        rawEvents: aiSelection.rawEvents ? activities : undefined,
+        wallets: aiSelection.wallets
+          ? [{ address: wallet.wallet_address, network: wallet.network }]
+          : undefined,
+      }),
+      meta: { createdAt: new Date().toISOString(), from: "wallet-modal" },
+    }
+
+    console.log("AI Analytics payload (wallet modal):", payload)
+    dispatch(setAnalyticsData(payload))
+    try {
+      localStorage.setItem("ai_analytics_payload", JSON.stringify(payload))
+    } catch (e) {
+      console.warn("Unable to write ai_analytics_payload", e)
+    }
+
+    const qs = new URLSearchParams()
+    if (selected.length) qs.set("selected", selected.join(","))
+    if (startDate) qs.set("startDate", startDate)
+    if (endDate) qs.set("endDate", endDate)
+
+    router.push(`/admin/dashboard/ai-analytics`)
+  }
+
+  // ===================== Web3 events for GrowthImage =====================
   const web3ShareEvents = useMemo(
     () =>
       (activities || []).map((tx) => ({
@@ -631,7 +721,7 @@ export default function WalletActivityModal({
         </button>
 
         <CardHeader className="border-b">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <CardTitle className="text-xl">
                 {wallet.wallet_name || "Wallet"}
@@ -677,7 +767,59 @@ export default function WalletActivityModal({
                 )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 🔻 AI Analytics selection dropdown */}
+              <DropdownMenu open={aiMenuOpen} onOpenChange={setAiMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" className="cursor-target">
+                    AI Analytics
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-64"
+                  onInteractOutside={() => setAiMenuOpen(false)}
+                  onEscapeKeyDown={() => setAiMenuOpen(false)}
+                  onCloseAutoFocus={(e) => e.preventDefault()}
+                >
+                  <DropdownMenuLabel>Select data to analyze</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={aiSelection.web3Events}
+                    onCheckedChange={() => handleStick("web3Events")}
+                  >
+                    Web3 Events (derived)
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={aiSelection.rawEvents}
+                    onCheckedChange={() => handleStick("rawEvents")}
+                  >
+                    Raw Transactions
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={aiSelection.wallets}
+                    onCheckedChange={() => handleStick("wallets")}
+                  >
+                    Wallet (address + network)
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                variant="default"
+                className="cursor-target"
+                onClick={openAIAnalytics}
+                disabled={!hasAnyAi}
+                title={
+                  hasAnyAi
+                    ? "Open AI Analytics with selected data"
+                    : "Pick at least one dataset"
+                }
+              >
+                Open AI Analytics
+              </Button>
+
               {!wallet.is_verified && (
                 <Button
                   onClick={handleVerifyClick}
