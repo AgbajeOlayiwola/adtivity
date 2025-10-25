@@ -60,14 +60,14 @@ const Header = () => {
           </Button>
         </Link>
       )}
-      <Link href="/dashboard" className="block md:py-0">
+      {/* <Link href="/dashboard" className="block md:py-0">
         <Button
           variant="default"
           className="cursor-target w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
         >
           View Demo
         </Button>
-      </Link>
+      </Link> */}
     </>
   )
 

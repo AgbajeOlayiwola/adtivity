@@ -73,7 +73,7 @@ const AnalyticsDashboard = () => {
     ...analyticsData,
     mentions_by_date: transformData(analyticsData?.mentions_by_date || {}),
   }
-
+  console.log("ksjd")
   // Check if data is truly empty after all attempts
   if (
     !analyticsData ||

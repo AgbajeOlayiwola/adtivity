@@ -144,7 +144,7 @@ export default function Home() {
         <div
           style={{
             width: "100%",
-            height: "100vh",
+            height: "800px",
             position: "absolute",
             zIndex: 1,
           }}
@@ -152,8 +152,8 @@ export default function Home() {
           <DotGrid
             dotSize={5}
             gap={10}
-            baseColor="#231b31"
-            activeColor="#5227FF"
+            baseColor="#1f2a30"
+            activeColor="#ff5b04"
             proximity={100}
             shockRadius={60}
             shockStrength={15}

@@ -1,11 +1,12 @@
-import Link from 'next/link';
+import Link from "next/link"
+import AdtivityLogo from "../assets/images/Adtivity_Full_Color_Logo_2.6"
 
-const Logo = ({ size = 'text-3xl' }: { size?: string }) => {
+const Logo = ({ size = "text-3xl" }: { size?: string }) => {
   return (
-    <Link href="/" className={`font-headline font-bold ${size} tracking-tighter bg-clip-text text-transparent bg-futuristic-gradient hover:opacity-80 transition-opacity`}>
-      Adtivity
+    <Link href="/" className="w-[15%]">
+      <AdtivityLogo />
     </Link>
-  );
-};
+  )
+}
 
-export default Logo;
+export default Logo

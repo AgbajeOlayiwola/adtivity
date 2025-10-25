@@ -1,4 +1,5 @@
 "use client"
+
 import { Modal } from "@/components/modal"
 import { MultiStepForm } from "@/components/MultiStepForm"
 import { Button } from "@/components/ui/button"
@@ -67,7 +68,7 @@ type TweetIdea = {
   }
 }
 
-const TwitterAnalytics = () => {
+export default function TwitterAnalyticsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { profile }: any = useSelector((store) => store)
   const [tweetIdeas, setTweetIdeas] = useState<TweetIdea[]>([])
@@ -91,13 +92,32 @@ const TwitterAnalytics = () => {
     setIsModalOpen(false)
     createdTweeterRefetch()
   }
-  const twitterId = profile?.twitter_profiles?.[0]?.id
+
+  // ---------- Robust twitterId resolver ----------
+  const twitterId: string | undefined = useMemo(() => {
+    const fromProfile =
+      profile?.twitter_profile?.id ??
+      profile?.twitter?.id ??
+      profile?.twitter_id ??
+      (Array.isArray(profile?.twitter_profiles)
+        ? profile.twitter_profiles[0]?.id
+        : profile?.twitter_profiles?.id)
+
+    const fromCreated =
+      createdTweeterData?.twitter_profile_id ??
+      createdTweeterData?.twitter_id ??
+      createdTweeterData?.profile?.twitter_profile_id
+
+    return fromProfile ?? fromCreated ?? undefined
+  }, [profile, createdTweeterData])
+
+  // console.log({ profile, createdTweeterData, twitterId })
 
   const {
     data: analyticsData,
     isLoading: analyticsLoad,
     isSuccess: analyticsSuccess,
-  }: any = useTwitterMentionsAnalyticsQuery(twitterId!, {
+  }: any = useTwitterMentionsAnalyticsQuery(twitterId as string, {
     skip: !twitterId,
   })
 
@@ -126,7 +146,6 @@ const TwitterAnalytics = () => {
         ? mentionsSeries.reduce((s: number, d: any) => s + (d.mentions || 0), 0)
         : undefined)
 
-    // Post-level aggregates if your API returns posts array
     const posts: any[] = Array.isArray(analyticsData?.posts)
       ? analyticsData.posts
       : Array.isArray(analyticsData?.top_posts)
@@ -160,25 +179,21 @@ const TwitterAnalytics = () => {
       analyticsData?.link_clicks ??
       (posts.length ? sum("link_clicks") : undefined)
 
-    // Engagement Rate per post: (likes + replies + reposts) / posts
     const engagementRate =
       postCount && Number(postCount) > 0
         ? ((Number(totalEngagements || 0) / Number(postCount)) * 100).toFixed(2)
         : undefined
 
-    // CTR from posts: clicks / impressions
     const clickThroughRate =
       impressions && impressions > 0
         ? ((Number(linkClicks || 0) / impressions) * 100).toFixed(2)
         : undefined
 
-    // Engagement-to-Follower Ratio: total engagements / followers
     const engagementToFollowerRatio =
       totalFollowers && totalFollowers > 0
         ? ((Number(totalEngagements || 0) / totalFollowers) * 100).toFixed(2)
         : undefined
 
-    // Follower growth delta over range
     const followerGrowth = (() => {
       if (!analyticsData?.followers_by_date) return undefined
       const points = followerSeries
@@ -200,17 +215,14 @@ const TwitterAnalytics = () => {
       }
     })()
 
-    // Community growth signals – unique active engagers if provided
     const activeEngagersUnique =
       analyticsData?.active_engagers_unique ??
       analyticsData?.engagers_unique_count ??
       undefined
 
-    // Influential mentions count if provided
     const influentialMentionsCount =
       analyticsData?.influential_mentions_count ?? undefined
 
-    // Sentiment summary if provided
     const sentiment = analyticsData?.sentiment ?? undefined
 
     return {
@@ -234,7 +246,6 @@ const TwitterAnalytics = () => {
     }
   }, [analyticsData, mentionsSeries, followerSeries])
 
-  // Top Performing Posts (by engagement)
   const topPosts = useMemo(() => {
     const posts = totals.postsForRanking
     if (!Array.isArray(posts) || posts.length === 0) return []
@@ -251,11 +262,7 @@ const TwitterAnalytics = () => {
   }, [totals.postsForRanking])
 
   const handleGenerate = async () => {
-    if (!twitterId) {
-      console.warn("No twitterId yet; aborting generate.")
-      return
-    }
-
+    if (!twitterId) return
     setIsGenerating(true)
     try {
       const res = await fetch("/api/generate-buzz-tweets", {
@@ -301,7 +308,8 @@ const TwitterAnalytics = () => {
     }
   }
 
-  if (analyticsLoad) {
+  // ---------- Loading & gating ----------
+  if (createdTweeterLoad) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white p-4">
         <div className="text-center">
@@ -325,7 +333,7 @@ const TwitterAnalytics = () => {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p className="mt-4 text-lg">Loading analytics data...</p>
+          <p className="mt-4 text-lg">Loading account…</p>
         </div>
       </div>
     )
@@ -345,167 +353,179 @@ const TwitterAnalytics = () => {
         </div>
       )}
 
-      {/* With Twitter integration */}
-      {createdTweeterSuccess && hasTwitterIntegration && (
-        <div className="min-h-screen text-white p-4 md:p-8 font-sans">
-          <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-100">
-              Social Analytics Dashboard
-            </h1>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
-              <span className="bg-gray-800 rounded-full px-3 py-1">
-                {analyticsData?.date_range?.start_date} —{" "}
-                {analyticsData?.date_range?.end_date}
-              </span>
+      {/* Integration present but no twitterId resolved */}
+      {createdTweeterSuccess && hasTwitterIntegration && !twitterId && (
+        <div className="mt-4 p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
+          <p className="mb-2 text-gray-300">
+            We detected a Twitter integration, but couldn't find the account ID.
+          </p>
+          <p className="text-sm text-gray-400">
+            Try re-opening the account modal or re-authenticating your Twitter
+            connection.
+          </p>
+          <div className="mt-4">
+            <Button onClick={handleOpenModal}>Fix Connection</Button>
+          </div>
+        </div>
+      )}
+
+      {/* With Twitter integration and resolved twitterId */}
+      {createdTweeterSuccess &&
+        hasTwitterIntegration &&
+        twitterId &&
+        (analyticsLoad ? (
+          <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white p-4">
+            <div className="text-center">
+              <svg
+                className="animate-spin h-10 w-10 text-white mx-auto"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <p className="mt-4 text-lg">Loading analytics data...</p>
             </div>
-          </header>
+          </div>
+        ) : (
+          <div className="min-h-screen text-white p-4 md:p-8 font-sans">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-gray-100">
+                Social Analytics Dashboard
+              </h1>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
+                <span className="bg-gray-800 rounded-full px-3 py-1">
+                  {analyticsData?.date_range?.start_date} —{" "}
+                  {analyticsData?.date_range?.end_date}
+                </span>
+              </div>
+            </header>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left: Stats + Charts */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* KPIs */}
-              <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-lg font-semibold text-gray-400">
-                    Mentions
-                  </h2>
-                  <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                    {safeToLocale(totals.totalMentions)}
-                  </p>
-                </div>
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-lg font-semibold text-gray-400">
-                    Engagement Rate
-                  </h2>
-                  <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                    {typeof totals.engagementRate === "string"
-                      ? `${totals.engagementRate}%`
-                      : "N/A"}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    ((likes+replies+reposts)/posts)
-                  </p>
-                </div>
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-lg font-semibold text-gray-400">
-                    Follower Growth
-                  </h2>
-                  <p className="text-2xl md:text-3xl font-bold mt-2 text-gray-50">
-                    {totals.followerGrowth?.abs !== undefined
-                      ? `${
-                          totals.followerGrowth.abs >= 0 ? "+" : ""
-                        }${safeToLocale(totals.followerGrowth.abs)}`
-                      : "N/A"}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {totals.followerGrowth?.pct
-                      ? `${totals.followerGrowth.pct}%`
-                      : ""}
-                  </p>
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left: Stats + Charts */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* KPIs */}
+                <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-lg font-semibold text-gray-400">
+                      Mentions
+                    </h2>
+                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
+                      {safeToLocale(totals.totalMentions)}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-lg font-semibold text-gray-400">
+                      Engagement Rate
+                    </h2>
+                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
+                      {analyticsSuccess &&
+                      typeof totals.engagementRate === "string"
+                        ? `${totals.engagementRate}%`
+                        : "N/A"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      ((likes+replies+reposts)/posts)
+                    </p>
+                  </div>
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-lg font-semibold text-gray-400">
+                      Follower Growth
+                    </h2>
+                    <p className="text-2xl md:text-3xl font-bold mt-2 text-gray-50">
+                      {totals.followerGrowth?.abs !== undefined
+                        ? `${
+                            totals.followerGrowth.abs >= 0 ? "+" : ""
+                          }${safeToLocale(totals.followerGrowth.abs)}`
+                        : "N/A"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {totals.followerGrowth?.pct
+                        ? `${totals.followerGrowth.pct}%`
+                        : ""}
+                    </p>
+                  </div>
 
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-lg font-semibold text-gray-400">
-                    Click-through (Clicks)
-                  </h2>
-                  <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                    {safeToLocale(totals.linkClicks)}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {totals.clickThroughRate
-                      ? `CTR: ${totals.clickThroughRate}%`
-                      : "CTR: N/A"}
-                  </p>
-                </div>
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-lg font-semibold text-gray-400">
-                    Engagement ÷ Followers
-                  </h2>
-                  <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                    {totals.engagementToFollowerRatio
-                      ? `${totals.engagementToFollowerRatio}%`
-                      : "N/A"}
-                  </p>
-                </div>
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-lg font-semibold text-gray-400">
-                    Active Engagers
-                  </h2>
-                  <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                    {safeToLocale(totals.activeEngagersUnique)}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Community growth signal
-                  </p>
-                </div>
-              </section>
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-lg font-semibold text-gray-400">
+                      Click-through (Clicks)
+                    </h2>
+                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
+                      {safeToLocale(totals.linkClicks)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {totals.clickThroughRate
+                        ? `CTR: ${totals.clickThroughRate}%`
+                        : "CTR: N/A"}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-lg font-semibold text-gray-400">
+                      Engagement ÷ Followers
+                    </h2>
+                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
+                      {totals.engagementToFollowerRatio
+                        ? `${totals.engagementToFollowerRatio}%`
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-lg font-semibold text-gray-400">
+                      Active Engagers
+                    </h2>
+                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
+                      {safeToLocale(totals.activeEngagersUnique)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Community growth signal
+                    </p>
+                  </div>
+                </section>
 
-              {/* Charts */}
-              <section className="grid grid-cols-1 gap-6">
-                {/* Mentions Over Time */}
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-200">
-                    Mentions Over Time
-                  </h2>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart
-                      data={mentionsSeries}
-                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="colorMentions"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#8884d8"
-                            stopOpacity={0.8}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#8884d8"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <XAxis
-                        dataKey="date"
-                        className="text-xs"
-                        stroke="#6b7280"
-                      />
-                      <YAxis className="text-xs" stroke="#6b7280" />
-                      <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                      <Area
-                        type="monotone"
-                        dataKey="mentions"
-                        stroke="#8884d8"
-                        fillOpacity={1}
-                        fill="url(#colorMentions)"
-                      />
-                      <Legend
-                        verticalAlign="top"
-                        height={36}
-                        wrapperStyle={{ top: -20, left: 0 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Follower Growth Over Time (renders only if series exists) */}
-                {followerSeries.length > 0 && (
+                {/* Charts */}
+                <section className="grid grid-cols-1 gap-6">
+                  {/* Mentions Over Time */}
                   <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
                     <h2 className="text-xl font-semibold mb-4 text-gray-200">
-                      Followers Over Time
+                      Mentions Over Time
                     </h2>
                     <ResponsiveContainer width="100%" height={300}>
-                      <LineChart
-                        data={followerSeries}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      <AreaChart
+                        data={mentionsSeries}
+                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                       >
+                        <defs>
+                          <linearGradient
+                            id="colorMentions"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#8884d8"
+                              stopOpacity={0.8}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#8884d8"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                        </defs>
                         <XAxis
                           dataKey="date"
                           className="text-xs"
@@ -513,282 +533,322 @@ const TwitterAnalytics = () => {
                         />
                         <YAxis className="text-xs" stroke="#6b7280" />
                         <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                        <Area
+                          type="monotone"
+                          dataKey="mentions"
+                          stroke="#8884d8"
+                          fillOpacity={1}
+                          fill="url(#colorMentions)"
+                        />
                         <Legend
                           verticalAlign="top"
                           height={36}
                           wrapperStyle={{ top: -20, left: 0 }}
                         />
-                        <Line
-                          type="monotone"
-                          dataKey="followers"
-                          stroke="#82ca9d"
-                          strokeWidth={3}
-                          dot={{ stroke: "#82ca9d", strokeWidth: 2 }}
-                        />
-                      </LineChart>
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
-                )}
 
-                {/* Engagement Breakdown (kept from your code, expects engagement_by_type) */}
-                {Array.isArray(analyticsData?.engagement_by_type) && (
-                  <section className="bg-gray-800 rounded-2xl p-6 shadow-xl mb-2">
-                    <h2 className="text-xl font-semibold mb-4 text-gray-200">
-                      Engagement Breakdown
-                    </h2>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart
-                        data={analyticsData?.engagement_by_type}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <XAxis
-                          dataKey="name"
-                          className="text-xs"
-                          stroke="#6b7280"
-                        />
-                        <YAxis className="text-xs" stroke="#6b7280" />
-                        <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                        <Legend
-                          verticalAlign="top"
-                          height={36}
-                          wrapperStyle={{ top: -20, left: 0 }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          stroke="#82ca9d"
-                          strokeWidth={3}
-                          dot={{ stroke: "#82ca9d", strokeWidth: 2 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </section>
-                )}
-              </section>
+                  {/* Followers Over Time */}
+                  {followerSeries.length > 0 && (
+                    <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                      <h2 className="text-xl font-semibold mb-4 text-gray-200">
+                        Followers Over Time
+                      </h2>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart
+                          data={followerSeries}
+                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                        >
+                          <XAxis
+                            dataKey="date"
+                            className="text-xs"
+                            stroke="#6b7280"
+                          />
+                          <YAxis className="text-xs" stroke="#6b7280" />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="#4b5563"
+                          />
+                          <Legend
+                            verticalAlign="top"
+                            height={36}
+                            wrapperStyle={{ top: -20, left: 0 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="followers"
+                            stroke="#82ca9d"
+                            strokeWidth={3}
+                            dot={{ stroke: "#82ca9d", strokeWidth: 2 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
 
-              {/* Top Performing Posts */}
-              <section className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                <h2 className="text-xl font-semibold mb-4 text-gray-200">
-                  Top Performing Posts (by engagement)
-                </h2>
-                {topPosts.length === 0 ? (
-                  <p className="text-sm text-gray-400">
-                    No post data available.
-                  </p>
-                ) : (
-                  <div className="overflow-auto rounded-xl border border-gray-700">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-900/40">
-                        <tr>
-                          <th className="text-left px-4 py-3 font-semibold text-gray-300">
-                            Post
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Engagement
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Likes
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Replies
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Reposts
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Impressions
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Clicks
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {topPosts.map((p: any) => (
-                          <tr key={p.id} className="border-t border-gray-700">
-                            <td className="px-4 py-3 max-w-[360px]">
-                              {p.url ? (
-                                <a
-                                  href={p.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-indigo-300 hover:text-indigo-200 underline"
-                                >
-                                  {p.text?.slice(0, 120) || "View post"}
-                                  {p.text?.length > 120 ? "…" : ""}
-                                </a>
-                              ) : (
-                                <span className="text-gray-200">
-                                  {p.text?.slice(0, 120) || "—"}
-                                  {p.text?.length > 120 ? "…" : ""}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.engagement)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.likes)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.replies)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.reposts)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.impressions)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.link_clicks)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
+                  {/* Engagement Breakdown */}
+                  {Array.isArray(analyticsData?.engagement_by_type) && (
+                    <section className="bg-gray-800 rounded-2xl p-6 shadow-xl mb-2">
+                      <h2 className="text-xl font-semibold mb-4 text-gray-200">
+                        Engagement Breakdown
+                      </h2>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart
+                          data={analyticsData?.engagement_by_type}
+                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                        >
+                          <XAxis
+                            dataKey="name"
+                            className="text-xs"
+                            stroke="#6b7280"
+                          />
+                          <YAxis className="text-xs" stroke="#6b7280" />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="#4b5563"
+                          />
+                          <Legend
+                            verticalAlign="top"
+                            height={36}
+                            wrapperStyle={{ top: -20, left: 0 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="value"
+                            stroke="#82ca9d"
+                            strokeWidth={3}
+                            dot={{ stroke: "#82ca9d", strokeWidth: 2 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </section>
+                  )}
+                </section>
 
-              {/* Influential Mentions / Sentiment (TBD-aware) */}
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-xl font-semibold mb-2 text-gray-200">
-                    Influential Mentions
+                {/* Top Performing Posts */}
+                <section className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-200">
+                    Top Performing Posts (by engagement)
                   </h2>
-                  {typeof totals.influentialMentionsCount === "number" ? (
-                    <p className="text-4xl font-bold text-gray-50">
-                      {totals.influentialMentionsCount.toLocaleString()}
+                  {topPosts.length === 0 ? (
+                    <p className="text-sm text-gray-400">
+                      No post data available.
                     </p>
                   ) : (
-                    <p className="text-gray-400">Coming soon</p>
-                  )}
-                </div>
-                <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                  <h2 className="text-xl font-semibold mb-2 text-gray-200">
-                    Sentiment Analysis
-                  </h2>
-                  {totals.sentiment ? (
-                    <div className="text-sm text-gray-300 space-y-1">
-                      {"positive" in totals.sentiment && (
-                        <div>
-                          Positive:{" "}
-                          {percent(
-                            totals.sentiment.positive,
-                            totals.sentiment.total
-                          )}
-                        </div>
-                      )}
-                      {"neutral" in totals.sentiment && (
-                        <div>
-                          Neutral:{" "}
-                          {percent(
-                            totals.sentiment.neutral,
-                            totals.sentiment.total
-                          )}
-                        </div>
-                      )}
-                      {"negative" in totals.sentiment && (
-                        <div>
-                          Negative:{" "}
-                          {percent(
-                            totals.sentiment.negative,
-                            totals.sentiment.total
-                          )}
-                        </div>
-                      )}
+                    <div className="overflow-auto rounded-xl border border-gray-700">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-900/40">
+                          <tr>
+                            <th className="text-left px-4 py-3 font-semibold text-gray-300">
+                              Post
+                            </th>
+                            <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                              Engagement
+                            </th>
+                            <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                              Likes
+                            </th>
+                            <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                              Replies
+                            </th>
+                            <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                              Reposts
+                            </th>
+                            <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                              Impressions
+                            </th>
+                            <th className="text-right px-4 py-3 font-semibold text-gray-300">
+                              Clicks
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {topPosts.map((p: any) => (
+                            <tr key={p.id} className="border-t border-gray-700">
+                              <td className="px-4 py-3 max-w-[360px]">
+                                {p.url ? (
+                                  <a
+                                    href={p.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-indigo-300 hover:text-indigo-200 underline"
+                                  >
+                                    {p.text?.slice(0, 120) || "View post"}
+                                    {p.text?.length > 120 ? "…" : ""}
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-200">
+                                    {p.text?.slice(0, 120) || "—"}
+                                    {p.text?.length > 120 ? "…" : ""}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {safeToLocale(p.engagement)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {safeToLocale(p.likes)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {safeToLocale(p.replies)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {safeToLocale(p.reposts)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {safeToLocale(p.impressions)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {safeToLocale(p.link_clicks)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ) : (
-                    <p className="text-gray-400">Coming soon</p>
                   )}
-                </div>
-              </section>
-            </div>
+                </section>
 
-            {/* Right: Generated Tweets */}
-            <aside className="lg:col-span-1 bg-gray-800 rounded-2xl p-4 md:p-6 shadow-xl h-fit sticky top-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-200">
-                  Generated Tweets
-                </h3>
-                <Button
-                  variant="secondary"
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? "Generating…" : "Generate"}
-                </Button>
-              </div>
-
-              {tweetIdeas.length === 0 ? (
-                <p className="text-gray-400 text-sm">
-                  Use <span className="font-semibold">Generate</span> to fetch
-                  ideas from your backend.
-                </p>
-              ) : (
-                <ul className="space-y-4">
-                  {tweetIdeas.map((t) => (
-                    <li
-                      key={t.id}
-                      className="bg-gray-900/60 border border-gray-700 rounded-xl p-4"
-                    >
-                      <p className="whitespace-pre-wrap text-gray-100 leading-relaxed">
-                        {t.text}
+                {/* Influential Mentions / Sentiment */}
+                <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-xl font-semibold mb-2 text-gray-200">
+                      Influential Mentions
+                    </h2>
+                    {typeof totals.influentialMentionsCount === "number" ? (
+                      <p className="text-4xl font-bold text-gray-50">
+                        {totals.influentialMentionsCount.toLocaleString()}
                       </p>
-                      {t.estimates &&
-                        (t.estimates.mentions ||
-                          t.estimates.likes ||
-                          t.estimates.retweets) && (
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                            {typeof t.estimates.mentions === "number" && (
-                              <span className="px-2 py-1 rounded-full bg-indigo-900/40 border border-indigo-700">
-                                Est. Mentions:{" "}
-                                <span className="font-semibold">
-                                  {t.estimates.mentions.toLocaleString()}
-                                </span>
-                              </span>
-                            )}
-                            {typeof t.estimates.likes === "number" && (
-                              <span className="px-2 py-1 rounded-full bg-emerald-900/40 border border-emerald-700">
-                                Est. Likes:{" "}
-                                <span className="font-semibold">
-                                  {t.estimates.likes.toLocaleString()}
-                                </span>
-                              </span>
-                            )}
-                            {typeof t.estimates.retweets === "number" && (
-                              <span className="px-2 py-1 rounded-full bg-cyan-900/40 border border-cyan-700">
-                                Est. Retweets:{" "}
-                                <span className="font-semibold">
-                                  {t.estimates.retweets.toLocaleString()}
-                                </span>
-                              </span>
+                    ) : (
+                      <p className="text-gray-400">Coming soon</p>
+                    )}
+                  </div>
+                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                    <h2 className="text-xl font-semibold mb-2 text-gray-200">
+                      Sentiment Analysis
+                    </h2>
+                    {totals.sentiment ? (
+                      <div className="text-sm text-gray-300 space-y-1">
+                        {"positive" in totals.sentiment && (
+                          <div>
+                            Positive:{" "}
+                            {percent(
+                              totals.sentiment.positive,
+                              totals.sentiment.total
                             )}
                           </div>
                         )}
-                      <div className="mt-3 flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => copyToClipboard(t.text)}
-                        >
-                          Copy
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => openTwitterCompose(t.text)}
-                        >
-                          Post…
-                        </Button>
+                        {"neutral" in totals.sentiment && (
+                          <div>
+                            Neutral:{" "}
+                            {percent(
+                              totals.sentiment.neutral,
+                              totals.sentiment.total
+                            )}
+                          </div>
+                        )}
+                        {"negative" in totals.sentiment && (
+                          <div>
+                            Negative:{" "}
+                            {percent(
+                              totals.sentiment.negative,
+                              totals.sentiment.total
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </aside>
+                    ) : (
+                      <p className="text-gray-400">Coming soon</p>
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              {/* Right: Generated Tweets */}
+              <aside className="lg:col-span-1 bg-gray-800 rounded-2xl p-4 md:p-6 shadow-xl h-fit sticky top-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-200">
+                    Generated Tweets
+                  </h3>
+                  <Button
+                    variant="secondary"
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? "Generating…" : "Generate"}
+                  </Button>
+                </div>
+
+                {tweetIdeas.length === 0 ? (
+                  <p className="text-gray-400 text-sm">
+                    Use <span className="font-semibold">Generate</span> to fetch
+                    ideas from your backend.
+                  </p>
+                ) : (
+                  <ul className="space-y-4">
+                    {tweetIdeas.map((t) => (
+                      <li
+                        key={t.id}
+                        className="bg-gray-900/60 border border-gray-700 rounded-xl p-4"
+                      >
+                        <p className="whitespace-pre-wrap text-gray-100 leading-relaxed">
+                          {t.text}
+                        </p>
+                        {t.estimates &&
+                          (t.estimates.mentions ||
+                            t.estimates.likes ||
+                            t.estimates.retweets) && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                              {typeof t.estimates.mentions === "number" && (
+                                <span className="px-2 py-1 rounded-full bg-indigo-900/40 border border-indigo-700">
+                                  Est. Mentions:{" "}
+                                  <span className="font-semibold">
+                                    {t.estimates.mentions.toLocaleString()}
+                                  </span>
+                                </span>
+                              )}
+                              {typeof t.estimates.likes === "number" && (
+                                <span className="px-2 py-1 rounded-full bg-emerald-900/40 border border-emerald-700">
+                                  Est. Likes:{" "}
+                                  <span className="font-semibold">
+                                    {t.estimates.likes.toLocaleString()}
+                                  </span>
+                                </span>
+                              )}
+                              {typeof t.estimates.retweets === "number" && (
+                                <span className="px-2 py-1 rounded-full bg-cyan-900/40 border border-cyan-700">
+                                  Est. Retweets:{" "}
+                                  <span className="font-semibold">
+                                    {t.estimates.retweets.toLocaleString()}
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        <div className="mt-3 flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => copyToClipboard(t.text)}
+                          >
+                            Copy
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openTwitterCompose(t.text)}
+                          >
+                            Post…
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </aside>
+            </div>
           </div>
-        </div>
-      )}
+        ))}
 
       {/* Modal */}
       <Modal open={isModalOpen} onClose={handleCloseModal}>
@@ -797,5 +857,3 @@ const TwitterAnalytics = () => {
     </div>
   )
 }
-
-export default TwitterAnalytics

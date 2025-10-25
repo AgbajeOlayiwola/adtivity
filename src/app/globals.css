@@ -8,19 +8,19 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 10%; /* Dark Charcoal #1A1A1A */
+    --background: 200, 18%, 13%%; /* Dark Charcoal #1A1A1A */
     --foreground: 0 0% 98%; /* Light text */
     --card: 0 0% 14%; /* Slightly lighter than background #242424 */
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 266 100% 50%; /* Electric Indigo #6F00FF */
+    --primary: 22 95% 55%; /* Electric Indigo #6F00FF */
     --primary-foreground: 0 0% 98%;
     --secondary: 185 100% 62%; /* Cyber Blue for secondary elements if needed */
     --secondary-foreground: 0 0% 10%;
     --muted: 0 0% 20%; /* Darker muted #333333 */
     --muted-foreground: 0 0% 60%; /* Lighter muted foreground */
-    --accent: 185 100% 62%; /* Cyber Blue #3BF3FF */
+    --accent: 146, 29%, 63%; /* Cyber Blue #3BF3FF */
     --accent-foreground: 0 0% 10%; /* Dark text on accent */
     --destructive: 0 72% 51%; /* Adjusted destructive for dark theme */
     --destructive-foreground: 0 0% 98%;
@@ -51,19 +51,19 @@ body {
      For now, let's make them mirror :root for consistency.
   */
   .dark {
-    --background: 0 0% 10%;
+    --background: 200, 18%, 13%;
     --foreground: 0 0% 98%;
     --card: 0 0% 14%;
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 266 100% 50%;
+    --primary: 22 95% 55%;
     --primary-foreground: 0 0% 98%;
     --secondary: 185 100% 62%;
     --secondary-foreground: 0 0% 10%;
     --muted: 0 0% 20%;
     --muted-foreground: 0 0% 60%;
-    --accent: 185 100% 62%;
+    --accent: 146, 29%, 63%;
     --accent-foreground: 0 0% 10%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
