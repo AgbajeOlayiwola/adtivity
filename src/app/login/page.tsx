@@ -58,7 +58,7 @@ export default function LoginPage() {
       data: platformUserLoginData,
       isLoading: _platformUserLoginLoad,
       isSuccess: platformUserLoginSuccess,
-      isError: _platformUserLoginFalse,
+      isError: platformUserLoginIsError,
       error: platformUserLoginErr,
       reset: _platformUserLoginReset,
     },
@@ -80,13 +80,22 @@ export default function LoginPage() {
         secure: process.env.NODE_ENV === "production", // true on Vercel
       })
       window.location.href = "/admin/dashboard"
-    } else if (platformUserLoginErr) {
-      // 4. Better error handling
+    }
+  }, [platformUserLoginSuccess, platformUserLoginData, dispatch])
+
+  useEffect(() => {
+    if (platformUserLoginIsError && platformUserLoginErr) {
+      console.log("Error detected:", platformUserLoginErr)
+
       const errorMessage =
         platformUserLoginErr?.data?.detail ||
+        platformUserLoginErr?.data?.message ||
         platformUserLoginErr?.detail ||
         platformUserLoginErr?.message ||
-        "Login failed, Try again!"
+        (platformUserLoginErr?.status === 423
+          ? "Account is locked. Please try again later."
+          : "") ||
+        "Login failed. Please try again!"
 
       toast.error(errorMessage, {
         position: "top-right",
@@ -98,7 +107,7 @@ export default function LoginPage() {
       })
       console.error("Login error:", platformUserLoginErr)
     }
-  }, [platformUserLoginSuccess, platformUserLoginErr, platformUserLoginData])
+  }, [platformUserLoginIsError, platformUserLoginErr])
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-dark-grid p-4 relative overflow-hidden">
