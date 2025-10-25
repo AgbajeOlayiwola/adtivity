@@ -29,6 +29,7 @@ import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { MdLocalDining } from "react-icons/md"
 import { useDispatch, useSelector } from "react-redux"
+import { ToastContainer, toast } from "react-toastify"
 import * as z from "zod"
 
 const loginSchema = z.object({
@@ -80,6 +81,12 @@ export default function LoginPage() {
       window.location.href = "/admin/dashboard"
     } else if (platformUserLoginErr) {
       // 4. Better error handling
+      const notify = () =>
+        toast(
+          platformUserLoginErr?.detail
+            ? platformUserLoginErr?.detail
+            : "Login failed, Try again!"
+        )
       console.error("Login error:", platformUserLoginErr)
       // Consider showing user feedback here (toast, alert, etc.)
     }
@@ -87,6 +94,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-dark-grid p-4 relative overflow-hidden">
+      <ToastContainer />
       <div
         className="absolute inset-0 opacity-5 bg-gradient-to-br from-primary via-transparent to-accent animate-gradient-bg"
         style={{ backgroundSize: "200% 200%" }}
