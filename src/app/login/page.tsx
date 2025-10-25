@@ -30,6 +30,7 @@ import { useForm } from "react-hook-form"
 import { MdLocalDining } from "react-icons/md"
 import { useDispatch, useSelector } from "react-redux"
 import { ToastContainer, toast } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
 import * as z from "zod"
 
 const loginSchema = z.object({
@@ -81,14 +82,21 @@ export default function LoginPage() {
       window.location.href = "/admin/dashboard"
     } else if (platformUserLoginErr) {
       // 4. Better error handling
-      const notify = () =>
-        toast(
-          platformUserLoginErr?.detail
-            ? platformUserLoginErr?.detail
-            : "Login failed, Try again!"
-        )
+      const errorMessage =
+        platformUserLoginErr?.data?.detail ||
+        platformUserLoginErr?.detail ||
+        platformUserLoginErr?.message ||
+        "Login failed, Try again!"
+
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      })
       console.error("Login error:", platformUserLoginErr)
-      // Consider showing user feedback here (toast, alert, etc.)
     }
   }, [platformUserLoginSuccess, platformUserLoginErr, platformUserLoginData])
 
