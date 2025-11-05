@@ -27,7 +27,7 @@ export const mainNavLinks: NavLink[] = [
   },
   {
     href: "/admin/twitter-analytics",
-    label: "Twitter Analytics (Coming Soon)",
+    label: "Twitter Analytics",
     icon: TrendingUp,
     group: "Analytics",
   },

@@ -1,8 +1,21 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
+import {
+  createApi,
+  fetchBaseQuery,
+  BaseQueryFn,
+  FetchArgs,
+  FetchBaseQueryError,
+} from "@reduxjs/toolkit/query/react"
+import { deleteCookie } from "cookies-next"
+
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
-export const mutationApi = createApi({
-  reducerPath: "api",
-  baseQuery: fetchBaseQuery({
+
+// Custom base query with 401 error handling
+const baseQueryWithAuth: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
+  const baseQuery = fetchBaseQuery({
     baseUrl,
     prepareHeaders: (headers: any, { getState }: any) => {
       const token = getState().token
@@ -12,10 +25,38 @@ export const mutationApi = createApi({
       if (token) {
         headers.set("Authorization", `Bearer ${token}`)
       }
-      // console.log(sessionStorage)
       return headers
     },
-  }),
+  })
+
+  const result = await baseQuery(args, api, extraOptions)
+
+  // Handle 401 Unauthorized responses
+  if (result.error && result.error.status === 401) {
+    // Clear token from redux store
+    api.dispatch({ type: "token/clearToken" })
+
+    // Clear auth cookie
+    deleteCookie("auth-token")
+
+    // Clear localStorage/sessionStorage if needed
+    if (typeof window !== "undefined") {
+      localStorage.clear()
+      sessionStorage.clear()
+    }
+
+    // Redirect to login
+    if (typeof window !== "undefined") {
+      window.location.href = "/login"
+    }
+  }
+
+  return result
+}
+
+export const mutationApi = createApi({
+  reducerPath: "api",
+  baseQuery: baseQueryWithAuth,
   endpoints: (builder) => ({
     createPlatformUsers: builder.mutation({
       query: (body: any) => ({
@@ -66,11 +107,18 @@ export const mutationApi = createApi({
         body,
       }),
     }),
+    deleteTwitterAccount: builder.mutation({
+      query: ({ twitterId }: { twitterId: string }) => ({
+        url: `/twitter/accounts/${twitterId}`,
+        method: "DELETE",
+      }),
+    }),
   }),
 })
 
 export const {
   useCreateTwitterAccountsMutation,
+  useDeleteTwitterAccountMutation,
   useTwitterUsersSearchMutation,
   useCreatePlatformUsersMutation,
   usePlatformUserLoginMutation,

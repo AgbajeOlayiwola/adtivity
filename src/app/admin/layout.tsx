@@ -1,10 +1,10 @@
 "use client"
 
+import AdtivityLogo from "@/components/assets/images/Adtivity_Full_Color_Logo_2.6"
 import {
   groupedNavLinks,
   secondaryNavLinks,
 } from "@/components/layout/navigation-links"
-import Logo from "@/components/shared/logo"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -91,19 +91,19 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider defaultOpen>
-      <div className="flex min-h-screen bg-background w-[100%]">
+      <div className="flex min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 w-[100%]">
         <Sidebar
           collapsible="icon"
-          className="border-r border-sidebar-border shadow-lg"
+          className="border-r border-gray-700/50 bg-gradient-to-b from-gray-900/95 to-gray-950/95 backdrop-blur-xl shadow-2xl shadow-primary/5"
         >
-          <SidebarHeader className="p-4 flex items-center justify-between">
-            <Logo size="text-2xl" />
-            <SidebarTrigger className="hidden md:group-data-[collapsible=icon]:hidden" />
+          <SidebarHeader className="p-6 flex items-center justify-between border-b border-gray-700/30">
+            <AdtivityLogo />
+            <SidebarTrigger className="hidden md:group-data-[collapsible=icon]:hidden hover:bg-gray-800/50 transition-colors" />
           </SidebarHeader>
-          <SidebarContent className="p-2 flex-grow">
+          <SidebarContent className="p-3 flex-grow">
             {Object.entries(groupedNavLinks).map(([groupName, links]) => (
               <SidebarGroup key={groupName}>
-                <SidebarGroupLabel className="text-xs font-semibold text-sidebar-foreground/70 uppercase tracking-wider group-data-[collapsible=icon]:hidden">
+                <SidebarGroupLabel className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-data-[collapsible=icon]:hidden mb-2 px-2">
                   {groupName}
                 </SidebarGroupLabel>
                 <SidebarMenu>
@@ -118,9 +118,10 @@ export default function DashboardLayout({
                           }
                           tooltip={{
                             children: link.label,
-                            className: "bg-primary text-primary-foreground",
+                            className:
+                              "bg-primary text-primary-foreground shadow-lg",
                           }}
-                          className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:font-semibold group-data-[collapsible=icon]:justify-center"
+                          className="text-gray-300 hover:bg-gray-800/60 hover:text-gray-100 transition-all duration-200 data-[active=true]:bg-gradient-to-r data-[active=true]:from-primary/90 data-[active=true]:to-accent/90 data-[active=true]:text-white data-[active=true]:font-semibold data-[active=true]:shadow-lg data-[active=true]:shadow-primary/20 group-data-[collapsible=icon]:justify-center rounded-xl"
                         >
                           <link.icon className="h-5 w-5 shrink-0" />
                           <span className="group-data-[collapsible=icon]:hidden">
@@ -134,7 +135,7 @@ export default function DashboardLayout({
               </SidebarGroup>
             ))}
           </SidebarContent>
-          <SidebarFooter className="p-2 border-t border-sidebar-border">
+          <SidebarFooter className="p-3 border-t border-gray-700/30 bg-gray-900/50">
             <SidebarMenu>
               {secondaryNavLinks.map((link) => (
                 <SidebarMenuItem key={link.href}>
@@ -148,9 +149,10 @@ export default function DashboardLayout({
                       }
                       tooltip={{
                         children: link.label,
-                        className: "bg-primary text-primary-foreground",
+                        className:
+                          "bg-primary text-primary-foreground shadow-lg",
                       }}
-                      className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center"
+                      className="text-gray-300 hover:bg-gray-800/60 hover:text-gray-100 transition-all duration-200 group-data-[collapsible=icon]:justify-center rounded-xl"
                     >
                       <link.icon className="h-5 w-5 shrink-0" />
                       <span className="group-data-[collapsible=icon]:hidden">
@@ -164,16 +166,16 @@ export default function DashboardLayout({
           </SidebarFooter>
         </Sidebar>
 
-        <SidebarInset className="flex-1 flex flex-col overflow-hidden">
-          <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-6">
+        <SidebarInset className="flex-1 flex flex-col overflow-hidden bg-transparent">
+          <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-gray-700/30 bg-gray-900/80 backdrop-blur-xl shadow-lg px-6">
             <div className="flex items-center gap-4">
-              <SidebarTrigger className="md:hidden" />
+              <SidebarTrigger className="md:hidden hover:bg-gray-800/50 transition-colors" />
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   type="search"
                   placeholder="Search..."
-                  className="pl-9 w-64 bg-card/50 border-border/70 focus:border-primary"
+                  className="pl-9 w-64 bg-gray-800/50 border-gray-700/50 focus:border-primary text-gray-200 placeholder:text-gray-500 focus:ring-2 focus:ring-primary/20"
                 />
               </div>
             </div>
@@ -181,7 +183,7 @@ export default function DashboardLayout({
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full text-muted-foreground hover:text-foreground"
+                className="rounded-full text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition-all"
               >
                 <Bell className="h-5 w-5" />
                 <span className="sr-only">Notifications</span>
@@ -190,30 +192,34 @@ export default function DashboardLayout({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="flex items-center gap-2 px-2 py-1 rounded-full h-auto"
+                    className="flex items-center gap-2 px-2 py-1 rounded-full h-auto hover:bg-gray-800/50 transition-all"
                   >
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="h-8 w-8 ring-2 ring-primary/20">
                       <AvatarImage
                         src="https://placehold.co/40x40.png"
                         alt="User Avatar"
                         data-ai-hint="person avatar"
                       />
-                      <AvatarFallback>AD</AvatarFallback>
+                      <AvatarFallback className="bg-primary/20 text-primary">
+                        AD
+                      </AvatarFallback>
                     </Avatar>
-                    <span className="hidden md:inline text-sm font-medium">
+                    <span className="hidden md:inline text-sm font-medium text-gray-200">
                       {userInfoData?.name}
                       <br /> {userInfoData?.email}
                     </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="w-56 bg-popover border-border shadow-xl"
+                  className="w-56 bg-gray-900/95 backdrop-blur-xl border-gray-700/50 shadow-2xl shadow-primary/5"
                 >
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuLabel className="text-gray-200">
+                    My Account
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-gray-700/50" />
+                  <DropdownMenuItem className="text-gray-300 focus:bg-gray-800/60 focus:text-gray-100">
                     <Link
                       href="/admin/profile"
                       className="cursor-target w-full"
@@ -221,7 +227,7 @@ export default function DashboardLayout({
                       Profile{" "}
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem className="text-gray-300 focus:bg-gray-800/60 focus:text-gray-100">
                     <Link
                       href="/admin/billing"
                       className="cursor-target w-full"
@@ -229,7 +235,7 @@ export default function DashboardLayout({
                       Billing{" "}
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem className="text-gray-300 focus:bg-gray-800/60 focus:text-gray-100">
                     <Link
                       href="/admin/settings"
                       className="cursor-target w-full"
@@ -237,8 +243,8 @@ export default function DashboardLayout({
                       Settings{" "}
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-gray-700/50" />
+                  <DropdownMenuItem className="text-gray-300 focus:bg-gray-800/60 focus:text-gray-100">
                     <Link href="/" className="cursor-target w-full">
                       Logout
                     </Link>

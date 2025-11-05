@@ -1,6 +1,7 @@
 // components/wallets/WalletActivityModal.tsx
 "use client"
 
+import { useWalletBalanceQuery } from "@/redux/api/queryApi"
 import { PublicKey } from "@solana/web3.js"
 import { format, formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
@@ -294,6 +295,41 @@ export default function WalletActivityModal({
   const [analytics, setAnalytics] = useState<WalletAnalytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [analyticsError, setAnalyticsError] = useState<string | null>(null)
+
+  // Fetch wallet balance
+  const {
+    data: walletBalanceData,
+    isLoading: walletBalanceLoading,
+    isError: walletBalanceError,
+  } = useWalletBalanceQuery(
+    {
+      walletAddress: wallet?.wallet_address,
+      network: wallet?.network,
+    },
+    {
+      skip: !open || !wallet?.wallet_address || !wallet?.network,
+    }
+  )
+
+  // Debug wallet balance query status
+  useEffect(() => {
+    console.log("Wallet Balance Query Status:", {
+      open,
+      wallet_address: wallet?.wallet_address,
+      network: wallet?.network,
+      skip: !open || !wallet?.wallet_address || !wallet?.network,
+      isLoading: walletBalanceLoading,
+      isError: walletBalanceError,
+      hasData: !!walletBalanceData,
+      data: walletBalanceData,
+    })
+  }, [
+    open,
+    wallet,
+    walletBalanceLoading,
+    walletBalanceError,
+    walletBalanceData,
+  ])
 
   const [recentHours, setRecentHours] = useState<number>(24)
   const [recentRows, setRecentRows] = useState<Txn[]>([])
@@ -876,170 +912,305 @@ export default function WalletActivityModal({
               )}
 
               {!analyticsLoading && !analyticsError && analytics ? (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <StatCard
-                    label="Total Txns (API)"
-                    value={analytics.total_transactions.toLocaleString()}
-                  />
-                  <StatCard
-                    label="Total Volume (USD)"
-                    value={formatUSD(analytics.total_volume_usd)}
-                  />
-                  <StatCard
-                    label="Unique Tokens"
-                    value={analytics.unique_tokens.toString()}
-                  />
-                  <StatCard
-                    label="Gas Spent (USD)"
-                    value={formatUSD(analytics.gas_spent_usd)}
-                  />
+                <div className="space-y-6">
+                  {/* Wallet Balance Section */}
+                  {walletBalanceData &&
+                    !walletBalanceLoading &&
+                    !walletBalanceError && (
+                      <Card className="bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <span>💰</span> Wallet Balance
+                          </CardTitle>
+                          <CardDescription>
+                            Current wallet holdings and token balances
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-4">
+                            <StatCard
+                              label="Native Balance (SOL)"
+                              value={
+                                (walletBalanceData as any)?.balance?.toFixed(
+                                  6
+                                ) || "0"
+                              }
+                            />
+                            <StatCard
+                              label="Native Balance (USD)"
+                              value={formatUSD(
+                                (walletBalanceData as any)?.balance_usd
+                              )}
+                            />
+                            <StatCard
+                              label="Total Portfolio Value (USD)"
+                              value={formatUSD(
+                                (walletBalanceData as any)?.total_value_usd
+                              )}
+                            />
+                          </div>
 
-                  <StatCard
-                    label={`Inflow (USD)${
-                      flows.inflowCount ? ` • ${flows.inflowCount} tx` : ""
-                    }`}
-                    value={formatUSD(flows.inflowUsd)}
-                  />
-                  <StatCard
-                    label={`Outflow (USD)${
-                      flows.outflowCount ? ` • ${flows.outflowCount} tx` : ""
-                    }`}
-                    value={formatUSD(flows.outflowUsd)}
-                  />
-                  <StatCard
-                    label="Net Flow (USD)"
-                    value={formatUSD(flows.netUsd)}
-                  />
+                          {/* Token Holdings */}
+                          {(walletBalanceData as any)?.tokens &&
+                            Array.isArray((walletBalanceData as any)?.tokens) &&
+                            (walletBalanceData as any).tokens.length > 0 && (
+                              <Card className="mt-4">
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm">
+                                    Token Holdings
+                                  </CardTitle>
+                                  <CardDescription>
+                                    {(walletBalanceData as any).tokens.length}{" "}
+                                    token
+                                    {(walletBalanceData as any).tokens
+                                      .length !== 1
+                                      ? "s"
+                                      : ""}{" "}
+                                    in wallet
+                                  </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="max-h-[400px] overflow-auto rounded-md border">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Token</TableHead>
+                                          <TableHead className="text-right">
+                                            Balance
+                                          </TableHead>
+                                          <TableHead className="text-right">
+                                            Value (USD)
+                                          </TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {(walletBalanceData as any).tokens
+                                          .filter(
+                                            (token: any) => token.balance > 0
+                                          )
+                                          .sort(
+                                            (a: any, b: any) =>
+                                              (b.balance_usd || 0) -
+                                              (a.balance_usd || 0)
+                                          )
+                                          .map((token: any, idx: number) => (
+                                            <TableRow key={idx}>
+                                              <TableCell>
+                                                <div className="flex flex-col gap-1">
+                                                  {token.symbol && (
+                                                    <Badge className="bg-primary/10 text-primary w-fit">
+                                                      {token.symbol}
+                                                    </Badge>
+                                                  )}
+                                                  {token.name && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                      {token.name}
+                                                    </span>
+                                                  )}
+                                                  <span className="font-mono text-xs text-muted-foreground">
+                                                    {truncate(token.mint, 8, 6)}
+                                                  </span>
+                                                </div>
+                                              </TableCell>
+                                              <TableCell className="text-right font-medium">
+                                                {Number(
+                                                  token.balance
+                                                ).toLocaleString(undefined, {
+                                                  maximumFractionDigits:
+                                                    token.decimals > 0
+                                                      ? Math.min(
+                                                          token.decimals,
+                                                          6
+                                                        )
+                                                      : 0,
+                                                })}
+                                              </TableCell>
+                                              <TableCell className="text-right font-semibold">
+                                                {formatUSD(token.balance_usd)}
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )}
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  <StatCard
-                    label="Total Transactions (derived)"
-                    value={totalTransactions.toLocaleString()}
-                  />
-                  <StatCard
-                    label="Daily Avg. Txns (derived)"
-                    value={String(dailyAverageTransactions)}
-                  />
+                  {/* Original Analytics Cards */}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <StatCard
+                      label="Total Txns (API)"
+                      value={analytics.total_transactions.toLocaleString()}
+                    />
+                    <StatCard
+                      label="Total Volume (USD)"
+                      value={formatUSD(analytics.total_volume_usd)}
+                    />
+                    <StatCard
+                      label="Unique Tokens"
+                      value={analytics.unique_tokens.toString()}
+                    />
+                    <StatCard
+                      label="Gas Spent (USD)"
+                      value={formatUSD(analytics.gas_spent_usd)}
+                    />
 
-                  <Card className="md:col-span-2">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">
-                        Transaction Types
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm flex flex-wrap gap-2">
-                      {Object.entries(analytics.transaction_types || {}).map(
-                        ([k, v]) => (
-                          <Badge
-                            key={k}
-                            variant="outline"
-                            className="px-2 py-1 capitalize"
-                          >
-                            {k}: {v as number}
-                          </Badge>
-                        )
-                      )}
-                    </CardContent>
-                  </Card>
+                    <StatCard
+                      label={`Inflow (USD)${
+                        flows.inflowCount ? ` • ${flows.inflowCount} tx` : ""
+                      }`}
+                      value={formatUSD(flows.inflowUsd)}
+                    />
+                    <StatCard
+                      label={`Outflow (USD)${
+                        flows.outflowCount ? ` • ${flows.outflowCount} tx` : ""
+                      }`}
+                      value={formatUSD(flows.outflowUsd)}
+                    />
+                    <StatCard
+                      label="Net Flow (USD)"
+                      value={formatUSD(flows.netUsd)}
+                    />
 
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Networks</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm flex flex-wrap gap-2">
-                      {analytics.networks?.map((n) => (
-                        <Badge
-                          key={n}
-                          className={`${
-                            networkBadgeColor[n] ?? "bg-muted text-foreground"
-                          }`}
-                        >
-                          {n}
-                        </Badge>
-                      ))}
-                    </CardContent>
-                  </Card>
+                    <StatCard
+                      label="Total Transactions (derived)"
+                      value={totalTransactions.toLocaleString()}
+                    />
+                    <StatCard
+                      label="Daily Avg. Txns (derived)"
+                      value={String(dailyAverageTransactions)}
+                    />
 
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Timeline</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm space-y-1">
-                      <div>
-                        First Tx:{" "}
-                        {format(new Date(analytics.first_transaction), "PPpp")}
-                      </div>
-                      <div>
-                        Last Tx:{" "}
-                        {format(new Date(analytics.last_transaction), "PPpp")}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="lg:col-span-2">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Top Tokens</CardTitle>
-                      <CardDescription>By volume (USD)</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-sm">
-                      {topTokens.length === 0 ? (
-                        <p className="text-muted-foreground">No token data.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {topTokens.map((t) => (
-                            <div
-                              key={t.symbol}
-                              className="flex items-center justify-between"
+                    <Card className="md:col-span-2">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">
+                          Transaction Types
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-sm flex flex-wrap gap-2">
+                        {Object.entries(analytics.transaction_types || {}).map(
+                          ([k, v]) => (
+                            <Badge
+                              key={k}
+                              variant="outline"
+                              className="px-2 py-1 capitalize"
                             >
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline">{t.symbol}</Badge>
-                                <span className="text-muted-foreground">
-                                  {t.pct.toFixed(1)}%
-                                </span>
-                              </div>
-                              <div className="font-medium">
-                                {formatUSD(t.volume_usd)}
-                              </div>
-                            </div>
-                          ))}
+                              {k}: {v as number}
+                            </Badge>
+                          )
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Networks</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-sm flex flex-wrap gap-2">
+                        {analytics.networks?.map((n) => (
+                          <Badge
+                            key={n}
+                            className={`${
+                              networkBadgeColor[n] ?? "bg-muted text-foreground"
+                            }`}
+                          >
+                            {n}
+                          </Badge>
+                        ))}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Timeline</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-sm space-y-1">
+                        <div>
+                          First Tx:{" "}
+                          {format(
+                            new Date(analytics.first_transaction),
+                            "PPpp"
+                          )}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        <div>
+                          Last Tx:{" "}
+                          {format(new Date(analytics.last_transaction), "PPpp")}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="lg:col-span-2">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Top Tokens</CardTitle>
+                        <CardDescription>By volume (USD)</CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-sm">
+                        {topTokens.length === 0 ? (
+                          <p className="text-muted-foreground">
+                            No token data.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {topTokens.map((t) => (
+                              <div
+                                key={t.symbol}
+                                className="flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline">{t.symbol}</Badge>
+                                  <span className="text-muted-foreground">
+                                    {t.pct.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="font-medium">
+                                  {formatUSD(t.volume_usd)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* ✅ Shareable Growth Image (Web3) */}
+                  <div className="mt-6">
+                    <GrowthImage
+                      dateRange={{
+                        startDate: startDate ?? null,
+                        endDate: endDate ?? null,
+                      }}
+                      selected={{
+                        pagePath: "All Pages",
+                        buttonName: "All Clicks",
+                        country: "World View",
+                      }}
+                      options={{
+                        pagePaths: ["All Pages"],
+                        buttonNames: ["All Clicks"],
+                      }}
+                      datasets={{
+                        web2: {
+                          pageViewsPerDay: [],
+                          clicksPerDay: [],
+                          usersPerDay: [],
+                          totalUniqueUsers: 0,
+                          regional: [],
+                          rawEvents: [],
+                        },
+                        web3: {
+                          events: web3ShareEvents,
+                          connectedWallets: [],
+                        },
+                      }}
+                    />
+                  </div>
                 </div>
               ) : null}
-
-              {/* ✅ Shareable Growth Image (Web3) */}
-              <div className="mt-6">
-                <GrowthImage
-                  dateRange={{
-                    startDate: startDate ?? null,
-                    endDate: endDate ?? null,
-                  }}
-                  selected={{
-                    pagePath: "All Pages",
-                    buttonName: "All Clicks",
-                    country: "World View",
-                  }}
-                  options={{
-                    pagePaths: ["All Pages"],
-                    buttonNames: ["All Clicks"],
-                  }}
-                  datasets={{
-                    web2: {
-                      pageViewsPerDay: [],
-                      clicksPerDay: [],
-                      usersPerDay: [],
-                      totalUniqueUsers: 0,
-                      regional: [],
-                      rawEvents: [],
-                    },
-                    web3: {
-                      events: web3ShareEvents,
-                      connectedWallets: [],
-                    },
-                  }}
-                />
-              </div>
             </TabsContent>
 
             {/* Recent */}

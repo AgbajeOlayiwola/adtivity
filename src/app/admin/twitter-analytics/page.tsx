@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import {
   useCreatedtweetersQuery,
   useTwitterMentionsAnalyticsQuery,
+  useTwitterFollowersQuery,
+  useTweetsQuery,
 } from "@/redux/api/queryApi"
 import { useMemo, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
@@ -21,11 +23,21 @@ import {
   YAxis,
 } from "recharts"
 import { z } from "zod"
+import KOLAnalysisModal from "@/components/kol-analysis-modal"
 
 // ---------------------- helpers ----------------------
 const transformMentions = (
-  mentionsByDate: Record<string, number> | undefined
+  mentionsByDate: Record<string, number> | Array<any> | undefined
 ) => {
+  // Handle array format from API
+  if (Array.isArray(mentionsByDate)) {
+    return mentionsByDate.map((item) => ({
+      date: item.date || "Unknown",
+      mentions: item.mentions ?? 0,
+      likes: item.likes ?? 0,
+    }))
+  }
+  // Handle object format
   if (!mentionsByDate || Object.keys(mentionsByDate).length === 0) return []
   return Object.keys(mentionsByDate).map((date) => ({
     date,
@@ -34,8 +46,16 @@ const transformMentions = (
 }
 
 const transformFollowers = (
-  followersByDate: Record<string, number> | undefined
+  followersByDate: Record<string, number> | Array<any> | undefined
 ) => {
+  // Handle array format from API
+  if (Array.isArray(followersByDate)) {
+    return followersByDate.map((item) => ({
+      date: item.date || "Unknown",
+      followers: item.followers ?? 0,
+    }))
+  }
+  // Handle object format
   if (!followersByDate || Object.keys(followersByDate).length === 0) return []
   return Object.keys(followersByDate).map((date) => ({
     date,
@@ -70,6 +90,7 @@ type TweetIdea = {
 
 export default function TwitterAnalyticsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [kolModalOpen, setKolModalOpen] = useState(false)
   const { profile }: any = useSelector((store) => store)
   const [tweetIdeas, setTweetIdeas] = useState<TweetIdea[]>([])
   const [count, setCount] = useState(5)
@@ -77,6 +98,56 @@ export default function TwitterAnalyticsPage() {
     "Excited, friendly, community-first, with one clear CTA"
   )
   const [isGenerating, setIsGenerating] = useState(false)
+  const [showTweetsModal, setShowTweetsModal] = useState(false)
+  const [tweetLimit, setTweetLimit] = useState(10)
+
+  // Date range state - default to start of month to current date
+  const getDefaultStartDate = () => {
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+    return firstDay.toISOString().split("T")[0]
+  }
+
+  const getCurrentDate = () => {
+    return new Date().toISOString().split("T")[0]
+  }
+
+  const [startDate, setStartDate] = useState(getDefaultStartDate())
+  const [endDate, setEndDate] = useState(getCurrentDate())
+
+  // Validate date range (max 30 days)
+  const handleStartDateChange = (newStartDate: string) => {
+    const start = new Date(newStartDate)
+    const end = new Date(endDate)
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays > 30) {
+      // Adjust end date to be 30 days from start
+      const maxEnd = new Date(start)
+      maxEnd.setDate(maxEnd.getDate() + 30)
+      const today = new Date()
+      setEndDate(
+        maxEnd > today ? getCurrentDate() : maxEnd.toISOString().split("T")[0]
+      )
+    }
+    setStartDate(newStartDate)
+  }
+
+  const handleEndDateChange = (newEndDate: string) => {
+    const start = new Date(startDate)
+    const end = new Date(newEndDate)
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays > 30) {
+      // Adjust start date to be 30 days before end
+      const minStart = new Date(end)
+      minStart.setDate(minStart.getDate() - 30)
+      setStartDate(minStart.toISOString().split("T")[0])
+    }
+    setEndDate(newEndDate)
+  }
 
   const dispatch = useDispatch()
 
@@ -93,7 +164,7 @@ export default function TwitterAnalyticsPage() {
     createdTweeterRefetch()
   }
 
-  // ---------- Robust twitterId resolver ----------
+  // ---------- Robust twitterId and companyId resolver ----------
   const twitterId: string | undefined = useMemo(() => {
     const fromProfile =
       profile?.twitter_profile?.id ??
@@ -111,15 +182,53 @@ export default function TwitterAnalyticsPage() {
     return fromProfile ?? fromCreated ?? undefined
   }, [profile, createdTweeterData])
 
+  const companyId: string | undefined = useMemo(() => {
+    // Extract company ID from twitter_companies array
+    const companies = createdTweeterData?.twitter_companies
+    if (Array.isArray(companies) && companies.length > 0) {
+      return companies[0]?.id
+    }
+    return undefined
+  }, [createdTweeterData])
+
   // console.log({ profile, createdTweeterData, twitterId })
 
   const {
     data: analyticsData,
     isLoading: analyticsLoad,
     isSuccess: analyticsSuccess,
-  }: any = useTwitterMentionsAnalyticsQuery(twitterId as string, {
-    skip: !twitterId,
-  })
+  }: any = useTwitterMentionsAnalyticsQuery(
+    { twitterId: twitterId as string, companyId, startDate, endDate },
+    {
+      skip: !twitterId,
+    }
+  )
+
+  // Fetch Twitter followers
+  const {
+    data: followersData,
+    isLoading: followersLoad,
+    isSuccess: followersSuccess,
+  }: any = useTwitterFollowersQuery(
+    { twitterId: twitterId as string },
+    {
+      skip: !twitterId,
+    }
+  )
+
+  // Fetch Twitter tweets - only when modal is open
+  const {
+    data: tweetsData,
+    isLoading: tweetsLoad,
+    isSuccess: tweetsSuccess,
+  }: any = useTweetsQuery(
+    { twitterId: twitterId as string },
+    {
+      skip: !twitterId || !showTweetsModal,
+    }
+  )
+
+  console.log({ followersData, tweetsData })
 
   const hasTwitterIntegration =
     createdTweeterData?.has_twitter_integration === true
@@ -128,7 +237,7 @@ export default function TwitterAnalyticsPage() {
 
   // -------- Derived series --------
   const mentionsSeries = useMemo(
-    () => transformMentions(analyticsData?.mentions_by_date || {}),
+    () => transformMentions(analyticsData?.mentions_by_date),
     [analyticsData]
   )
 
@@ -400,107 +509,277 @@ export default function TwitterAnalyticsPage() {
             </div>
           </div>
         ) : (
-          <div className="min-h-screen text-white p-4 md:p-8 font-sans">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
-              <h1 className="text-3xl md:text-4xl font-extrabold text-gray-100">
-                Social Analytics Dashboard
-              </h1>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
-                <span className="bg-gray-800 rounded-full px-3 py-1">
-                  {analyticsData?.date_range?.start_date} —{" "}
-                  {analyticsData?.date_range?.end_date}
-                </span>
-              </div>
-            </header>
+          <div className="min-h-screen text-white p-4 md:p-8 font-sans bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+            {/* Header with Glassmorphism Effect */}
+            <div className="backdrop-blur-md bg-gray-900/50 rounded-3xl border border-gray-800/50 p-6 mb-8 shadow-2xl">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+                    Social Analytics Dashboard
+                  </h1>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Track your Twitter performance and engagement
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* KOL Analysis Button & Date Range Selector */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <Button
+                    onClick={() => setKolModalOpen(true)}
+                    className="cursor-target bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 py-2.5 shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
+                  >
+                    KOL Analysis
+                  </Button>
+                  <div className="flex items-center gap-2 bg-gray-800/80 backdrop-blur rounded-xl p-2.5 border border-gray-700/50 shadow-lg">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                      <div className="flex items-center gap-2">
+                        <label
+                          htmlFor="start-date"
+                          className="text-xs text-gray-400 font-medium"
+                        >
+                          From:
+                        </label>
+                        <input
+                          id="start-date"
+                          type="date"
+                          value={startDate}
+                          max={getCurrentDate()}
+                          onChange={(e) =>
+                            handleStartDateChange(e.target.value)
+                          }
+                          className="bg-gray-900/90 text-gray-200 text-sm rounded-lg px-3 py-1.5 border border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all"
+                        />
+                      </div>
+                      <span className="text-gray-500 hidden sm:block">→</span>
+                      <div className="flex items-center gap-2">
+                        <label
+                          htmlFor="end-date"
+                          className="text-xs text-gray-400 font-medium"
+                        >
+                          To:
+                        </label>
+                        <input
+                          id="end-date"
+                          type="date"
+                          value={endDate}
+                          max={getCurrentDate()}
+                          onChange={(e) => handleEndDateChange(e.target.value)}
+                          className="bg-gray-900/90 text-gray-200 text-sm rounded-lg px-3 py-1.5 border border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-gray-500 bg-gray-800/50 rounded-lg px-3 py-1.5">
+                    <span className="text-primary">⏱</span>
+                    <span>Max 30 days</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Empty State Banner */}
+              {totals.totalMentions === 0 && totals.totalLikes === 0 && (
+                <div className="mt-6 bg-gradient-to-r from-blue-900/20 via-blue-800/10 to-blue-900/20 border border-blue-700/30 rounded-2xl p-4 text-center backdrop-blur">
+                  <p className="text-blue-200 flex items-center justify-center gap-2">
+                    <span className="text-2xl">📊</span>
+                    <span>
+                      Your analytics data is being collected. Check back soon to
+                      see your Twitter performance metrics!
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Left: Stats + Charts */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="lg:col-span-3 space-y-6">
                 {/* KPIs */}
-                <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Total Mentions - Always show */}
+                  <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-primary/50 transition-all duration-300 hover:scale-105">
                     <h2 className="text-lg font-semibold text-gray-400">
-                      Mentions
+                      Total Mentions
                     </h2>
                     <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
                       {safeToLocale(totals.totalMentions)}
                     </p>
-                  </div>
-                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-lg font-semibold text-gray-400">
-                      Engagement Rate
-                    </h2>
-                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                      {analyticsSuccess &&
-                      typeof totals.engagementRate === "string"
-                        ? `${totals.engagementRate}%`
-                        : "N/A"}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      ((likes+replies+reposts)/posts)
-                    </p>
-                  </div>
-                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-lg font-semibold text-gray-400">
-                      Follower Growth
-                    </h2>
-                    <p className="text-2xl md:text-3xl font-bold mt-2 text-gray-50">
-                      {totals.followerGrowth?.abs !== undefined
-                        ? `${
-                            totals.followerGrowth.abs >= 0 ? "+" : ""
-                          }${safeToLocale(totals.followerGrowth.abs)}`
-                        : "N/A"}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {totals.followerGrowth?.pct
-                        ? `${totals.followerGrowth.pct}%`
-                        : ""}
-                    </p>
+                    {totals.totalMentions > 0 && (
+                      <div className="mt-2 flex items-center gap-1 text-green-400 text-sm">
+                        <span>↗</span>
+                        <span>Active</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-lg font-semibold text-gray-400">
-                      Click-through (Clicks)
-                    </h2>
-                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                      {safeToLocale(totals.linkClicks)}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {totals.clickThroughRate
-                        ? `CTR: ${totals.clickThroughRate}%`
-                        : "CTR: N/A"}
-                    </p>
-                  </div>
-                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-lg font-semibold text-gray-400">
-                      Engagement ÷ Followers
-                    </h2>
-                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                      {totals.engagementToFollowerRatio
-                        ? `${totals.engagementToFollowerRatio}%`
-                        : "N/A"}
-                    </p>
-                  </div>
-                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-lg font-semibold text-gray-400">
-                      Active Engagers
-                    </h2>
-                    <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50">
-                      {safeToLocale(totals.activeEngagersUnique)}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Community growth signal
-                    </p>
-                  </div>
+                  {/* Total Likes */}
+                  {typeof totals.totalLikes === "number" && (
+                    <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-accent/50 transition-all duration-300 hover:scale-105">
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-accent/10 rounded-full blur-2xl"></div>
+                      <h2 className="text-lg font-semibold text-gray-400 relative z-10">
+                        Total Likes
+                      </h2>
+                      <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50 relative z-10">
+                        {safeToLocale(totals.totalLikes)}
+                      </p>
+                      {totals.totalLikes > 0 && (
+                        <div className="mt-2 flex items-center gap-1 text-green-400 text-sm font-medium relative z-10">
+                          <span>↗</span>
+                          <span>Growing</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Total Followers */}
+                  {typeof totals.totalFollowers === "number" && (
+                    <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-primary/50 transition-all duration-300 hover:scale-105">
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full blur-2xl"></div>
+                      <h2 className="text-lg font-semibold text-gray-400 relative z-10">
+                        Total Followers
+                      </h2>
+                      <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50 relative z-10">
+                        {safeToLocale(totals.totalFollowers)}
+                      </p>
+                      {totals.followerGrowth?.abs !== undefined && (
+                        <p className="text-sm text-gray-400 mt-1 relative z-10">
+                          {totals.followerGrowth.abs >= 0 ? (
+                            <span className="text-green-400 flex items-center gap-1 font-medium">
+                              <span>↗</span>+
+                              {safeToLocale(totals.followerGrowth.abs)}
+                              {totals.followerGrowth.pct &&
+                                ` (${totals.followerGrowth.pct}%)`}
+                            </span>
+                          ) : (
+                            <span className="text-red-400 flex items-center gap-1 font-medium">
+                              <span>↘</span>
+                              {safeToLocale(totals.followerGrowth.abs)}
+                              {totals.followerGrowth.pct &&
+                                ` (${totals.followerGrowth.pct}%)`}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Engagement Rate */}
+                  {analyticsSuccess &&
+                    typeof totals.engagementRate === "string" && (
+                      <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-accent/50 transition-all duration-300 hover:scale-105">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-accent/10 rounded-full blur-2xl"></div>
+                        <h2 className="text-lg font-semibold text-gray-400 relative z-10">
+                          Engagement Rate
+                        </h2>
+                        <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50 relative z-10">
+                          {totals.engagementRate}%
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1 relative z-10">
+                          Per post average
+                        </p>
+                      </div>
+                    )}
+
+                  {/* Total Engagements */}
+                  {typeof totals.totalEngagements === "number" &&
+                    totals.totalEngagements > 0 && (
+                      <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-primary/50 transition-all duration-300 hover:scale-105">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full blur-2xl"></div>
+                        <h2 className="text-lg font-semibold text-gray-400 relative z-10">
+                          Total Engagements
+                        </h2>
+                        <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50 relative z-10">
+                          {safeToLocale(totals.totalEngagements)}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1 relative z-10">
+                          Likes + Replies + Reposts
+                        </p>
+                      </div>
+                    )}
+
+                  {/* Link Clicks */}
+                  {typeof totals.linkClicks === "number" &&
+                    totals.linkClicks > 0 && (
+                      <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-accent/50 transition-all duration-300 hover:scale-105">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-accent/10 rounded-full blur-2xl"></div>
+                        <h2 className="text-lg font-semibold text-gray-400 relative z-10">
+                          Link Clicks
+                        </h2>
+                        <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50 relative z-10">
+                          {safeToLocale(totals.linkClicks)}
+                        </p>
+                        {totals.clickThroughRate && (
+                          <p className="text-xs text-gray-400 mt-1 relative z-10">
+                            CTR: {totals.clickThroughRate}%
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                  {/* Active Engagers */}
+                  {typeof totals.activeEngagersUnique === "number" &&
+                    totals.activeEngagersUnique > 0 && (
+                      <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-green-500/50 transition-all duration-300 hover:scale-105">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-full blur-2xl"></div>
+                        <h2 className="text-lg font-semibold text-gray-400 relative z-10">
+                          Active Engagers
+                        </h2>
+                        <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50 relative z-10">
+                          {safeToLocale(totals.activeEngagersUnique)}
+                        </p>
+                        <p className="text-xs text-green-400 mt-1 flex items-center gap-1 font-medium relative z-10">
+                          <span>↗</span>
+                          Community growth signal
+                        </p>
+                      </div>
+                    )}
+
+                  {/* Impressions */}
+                  {typeof totals.impressions === "number" &&
+                    totals.impressions > 0 && (
+                      <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-primary/50 transition-all duration-300 hover:scale-105">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full blur-2xl"></div>
+                        <h2 className="text-lg font-semibold text-gray-400 relative z-10">
+                          Impressions
+                        </h2>
+                        <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50 relative z-10">
+                          {safeToLocale(totals.impressions)}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1 relative z-10">
+                          Total views
+                        </p>
+                      </div>
+                    )}
+
+                  {/* Post Count */}
+                  {typeof totals.postCount === "number" &&
+                    totals.postCount > 0 && (
+                      <div className="group bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl relative overflow-hidden border border-gray-700/50 hover:border-accent/50 transition-all duration-300 hover:scale-105">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-accent/10 rounded-full blur-2xl"></div>
+                        <h2 className="text-lg font-semibold text-gray-400 relative z-10">
+                          Posts
+                        </h2>
+                        <p className="text-4xl md:text-5xl font-bold mt-2 text-gray-50 relative z-10">
+                          {safeToLocale(totals.postCount)}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1 relative z-10">
+                          In this period
+                        </p>
+                      </div>
+                    )}
                 </section>
 
                 {/* Charts */}
                 <section className="grid grid-cols-1 gap-6">
                   {/* Mentions Over Time */}
-                  <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-xl font-semibold mb-4 text-gray-200">
-                      Mentions Over Time
-                    </h2>
+                  <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl border border-gray-700/50">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-semibold text-gray-200">
+                        Mentions Over Time
+                      </h2>
+                      <span className="text-xs text-gray-400 bg-gray-900/50 px-3 py-1 rounded-full">
+                        📈 Trend Analysis
+                      </span>
+                    </div>
                     <ResponsiveContainer width="100%" height={300}>
                       <AreaChart
                         data={mentionsSeries}
@@ -710,7 +989,7 @@ export default function TwitterAnalyticsPage() {
                   )}
                 </section>
 
-                {/* Influential Mentions / Sentiment */}
+                {/* Influential Mentions / Sentiment / Top Topics */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
                     <h2 className="text-xl font-semibold mb-2 text-gray-200">
@@ -721,7 +1000,7 @@ export default function TwitterAnalyticsPage() {
                         {totals.influentialMentionsCount.toLocaleString()}
                       </p>
                     ) : (
-                      <p className="text-gray-400">Coming soon</p>
+                      <p className="text-gray-400">No data available</p>
                     )}
                   </div>
                   <div className="bg-gray-800 rounded-2xl p-6 shadow-xl">
@@ -759,8 +1038,53 @@ export default function TwitterAnalyticsPage() {
                         )}
                       </div>
                     ) : (
-                      <p className="text-gray-400">Coming soon</p>
+                      <p className="text-gray-400">No data available</p>
                     )}
+                  </div>
+                </section>
+
+                {/* Top Topics */}
+                {Array.isArray(analyticsData?.top_topics) &&
+                  analyticsData.top_topics.length > 0 && (
+                    <section className="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                      <h2 className="text-xl font-semibold mb-4 text-gray-200">
+                        Top Topics
+                      </h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {analyticsData.top_topics.map(
+                          (topic: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between bg-gray-900/60 border border-gray-700 rounded-lg p-4"
+                            >
+                              <span className="text-gray-200 font-medium">
+                                {topic.name}
+                              </span>
+                              <span className="text-2xl font-bold text-primary">
+                                {topic.mentions}
+                              </span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                {/* View Tweets Button */}
+                <section className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 shadow-xl border border-gray-700/50">
+                  <div className="text-center">
+                    <h2 className="text-xl font-semibold text-gray-200 mb-3">
+                      Your Recent Tweets
+                    </h2>
+                    <p className="text-sm text-gray-400 mb-6">
+                      View your latest tweets with engagement metrics
+                    </p>
+                    <Button
+                      onClick={() => setShowTweetsModal(true)}
+                      className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-full transition-all duration-300 hover:scale-105"
+                    >
+                      View Tweets
+                    </Button>
                   </div>
                 </section>
               </div>
@@ -854,6 +1178,131 @@ export default function TwitterAnalyticsPage() {
       <Modal open={isModalOpen} onClose={handleCloseModal}>
         <MultiStepForm onClose={handleCloseModal} />
       </Modal>
+
+      {/* Tweets Modal */}
+      <Modal open={showTweetsModal} onClose={() => setShowTweetsModal(false)}>
+        <div className="bg-gray-900 rounded-2xl p-6 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-200">Recent Tweets</h2>
+            <div className="flex items-center gap-3">
+              <label htmlFor="tweet-limit" className="text-sm text-gray-400">
+                Show:
+              </label>
+              <select
+                id="tweet-limit"
+                value={tweetLimit}
+                onChange={(e) => setTweetLimit(Number(e.target.value))}
+                className="bg-gray-800 text-gray-200 text-sm rounded-lg px-3 py-1.5 border border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+              >
+                <option value={10}>10 tweets</option>
+                <option value={25}>25 tweets</option>
+                <option value={50}>50 tweets</option>
+                <option value={100}>100 tweets</option>
+              </select>
+            </div>
+          </div>
+
+          {tweetsLoad ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <svg
+                  className="animate-spin h-12 w-12 mx-auto mb-4 text-primary"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                <p className="text-gray-400">Loading tweets...</p>
+              </div>
+            </div>
+          ) : Array.isArray(tweetsData) && tweetsData.length > 0 ? (
+            <div className="overflow-y-auto pr-2 space-y-4">
+              {tweetsData.slice(0, tweetLimit).map((tweet: any) => (
+                <div
+                  key={tweet.id}
+                  className="bg-gray-800/60 border border-gray-700 rounded-xl p-4 hover:border-primary/50 transition-all duration-300"
+                >
+                  <p className="text-gray-200 text-sm mb-3">{tweet.text}</p>
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1">
+                        <span className="text-red-400">♥</span>
+                        <span>{tweet.like_count || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-green-400">↻</span>
+                        <span>{tweet.retweet_count || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-blue-400">💬</span>
+                        <span>{tweet.reply_count || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-purple-400">⎙</span>
+                        <span>{tweet.quote_count || 0}</span>
+                      </div>
+                    </div>
+                    <div className="text-gray-500">
+                      {new Date(tweet.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  {tweet.mentions && tweet.mentions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {tweet.mentions
+                        .slice(0, 5)
+                        .map((mention: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full"
+                          >
+                            @{mention}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                  {tweet.hashtags && tweet.hashtags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {tweet.hashtags
+                        .slice(0, 5)
+                        .map((hashtag: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full"
+                          >
+                            #{hashtag}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-400">No tweets available</p>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* KOL Analysis Modal */}
+      <KOLAnalysisModal
+        open={kolModalOpen}
+        onClose={() => setKolModalOpen(false)}
+      />
     </div>
   )
 }
