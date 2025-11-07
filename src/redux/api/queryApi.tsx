@@ -75,7 +75,7 @@ export const queryApi = createApi({
     companyData: builder.query({
       query: ({ id }: any) => {
         return {
-          url: `/dashboard/client-companies/${id}/events`,
+          url: `/dashboard/all-events?company_id=${id}`,
         }
       },
     }),
@@ -153,10 +153,33 @@ export const queryApi = createApi({
         url: `/dashboard/analytics/web3/wallet/${walletAddress}/balance?network=${network}`,
       }),
     }),
+    userEngagementTimeSeries: builder.query({
+      query: ({ companyId, startDate, endDate, intervalHours }: any) => {
+        let url = `/user-engagement/analytics/${companyId}/time-series/?start_date=${startDate}`
+        if (endDate) {
+          url += `&end_date=${endDate}`
+        }
+        if (intervalHours) {
+          url += `&interval_hours=${intervalHours}`
+        }
+        return { url }
+      },
+    }),
+    newUsersAnalytics: builder.query({
+      query: ({ companyId, startDate, endDate }: any) => {
+        let url = `/user-engagement/analytics/${companyId}/new-users/?start_date=${startDate}`
+        if (endDate) {
+          url += `&end_date=${endDate}`
+        }
+        return { url }
+      },
+    }),
   }),
 })
 
 export const {
+  useNewUsersAnalyticsQuery,
+  useUserEngagementTimeSeriesQuery,
   useWalletBalanceQuery,
   useConnectedWalletsQuery,
   useTwitterMentionsAnalyticsQuery,

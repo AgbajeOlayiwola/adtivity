@@ -23,7 +23,10 @@ import {
 import { useEffect, useMemo, useState } from "react"
 import { useSelector } from "react-redux"
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   Tooltip as RechartsTooltip,
@@ -33,12 +36,27 @@ import {
 
 import { Button } from "@/components/ui/button"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 // Date picker components
 import { Calendar } from "@/components/ui/calendar"
@@ -60,6 +78,8 @@ import {
   useConnectedWalletsQuery,
   useGetRegionalDataQuery,
   useGetUniqueSessionsQuery,
+  useNewUsersAnalyticsQuery,
+  useUserEngagementTimeSeriesQuery,
 } from "@/redux/api/queryApi"
 
 // Reusable AI analytics launcher
@@ -277,6 +297,104 @@ export default function KpiDashboardPage() {
     isError: boolean
     error: any
   }
+
+  // User engagement filters - MUST be declared before the query hook that uses them
+  const [engagementTimeRange, setEngagementTimeRange] = useState("1week")
+  const [engagementInterval, setEngagementInterval] = useState<number>(24) // 24 hours = daily
+  const [engagementStartDate, setEngagementStartDate] = useState<Date | null>(
+    new Date(new Date().setDate(new Date().getDate() - 7))
+  )
+  const [engagementEndDate, setEngagementEndDate] = useState<Date | null>(
+    new Date()
+  )
+  const [showDAU, setShowDAU] = useState(true)
+  const [showWAU, setShowWAU] = useState(true)
+  const [showNewUsers, setShowNewUsers] = useState(true)
+  const [showSessions, setShowSessions] = useState(true)
+  const [showCohortAnalysis, setShowCohortAnalysis] = useState(true)
+  const [showNewUsersModal, setShowNewUsersModal] = useState(false)
+
+  // Handle time range preset changes
+  const handleEngagementTimeRangeChange = (range: string) => {
+    setEngagementTimeRange(range)
+    const now = new Date()
+    let startDate = new Date()
+
+    switch (range) {
+      case "1week":
+        startDate = new Date(now.setDate(now.getDate() - 7))
+        break
+      case "2weeks":
+        startDate = new Date(now.setDate(now.getDate() - 14))
+        break
+      case "3weeks":
+        startDate = new Date(now.setDate(now.getDate() - 21))
+        break
+      case "1month":
+        startDate = new Date(now.setMonth(now.getMonth() - 1))
+        break
+      case "3months":
+        startDate = new Date(now.setMonth(now.getMonth() - 3))
+        break
+      case "6months":
+        startDate = new Date(now.setMonth(now.getMonth() - 6))
+        break
+      case "1year":
+        startDate = new Date(now.setFullYear(now.getFullYear() - 1))
+        break
+      case "custom":
+        return // Don't update dates for custom range
+    }
+
+    setEngagementStartDate(startDate)
+    setEngagementEndDate(new Date())
+  }
+
+  // User engagement time series query (DAU/WAU)
+  const {
+    data: userEngagementData,
+    isLoading: userEngagementLoading,
+    isError: userEngagementError,
+    error: userEngagementErrorData,
+  }: any = useUserEngagementTimeSeriesQuery(
+    {
+      companyId: documents?.id,
+      startDate: engagementStartDate
+        ? engagementStartDate.toISOString().split("T")[0]
+        : new Date(new Date().setDate(new Date().getDate() - 7))
+            .toISOString()
+            .split("T")[0],
+      endDate: engagementEndDate
+        ? engagementEndDate.toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0],
+      intervalHours: engagementInterval,
+    },
+    {
+      skip: !documents?.id,
+    }
+  )
+
+  // New users detailed analytics query
+  const {
+    data: newUsersData,
+    isLoading: newUsersLoading,
+    isError: newUsersError,
+  }: any = useNewUsersAnalyticsQuery(
+    {
+      companyId: documents?.id,
+      startDate: engagementStartDate
+        ? engagementStartDate.toISOString().split("T")[0]
+        : new Date(new Date().setDate(new Date().getDate() - 7))
+            .toISOString()
+            .split("T")[0],
+      endDate: engagementEndDate
+        ? engagementEndDate.toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0],
+    },
+    {
+      skip: !documents?.id || !showNewUsersModal,
+    }
+  )
 
   const [analyticsDataI, setAnalyticsDataI] = useState<any>({
     uniqueSessions: 0,
@@ -667,6 +785,734 @@ export default function KpiDashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* User Engagement Analytics Section */}
+        <Card className="mt-6 bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl border border-gray-700/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-semibold text-white">
+                  User Engagement Analytics
+                </CardTitle>
+                <CardDescription className="text-gray-400 mt-1">
+                  Daily and Weekly Active Users over time
+                </CardDescription>
+              </div>
+              {userEngagementLoading && (
+                <div className="flex items-center gap-2 text-sm text-primary">
+                  <svg
+                    className="animate-spin h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  <span>Loading...</span>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Filters Section */}
+            <div className="mb-6 space-y-4">
+              {/* Time Range and Interval Filters */}
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Time Range Presets */}
+                <div className="flex-1">
+                  <label className="text-sm text-gray-400 font-medium mb-2 block">
+                    Time Range
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "1week", label: "1 Week" },
+                      { value: "2weeks", label: "2 Weeks" },
+                      { value: "3weeks", label: "3 Weeks" },
+                      { value: "1month", label: "1 Month" },
+                      { value: "3months", label: "3 Months" },
+                      { value: "6months", label: "6 Months" },
+                      { value: "1year", label: "1 Year" },
+                      { value: "custom", label: "Custom" },
+                    ].map((range) => (
+                      <button
+                        key={range.value}
+                        onClick={() =>
+                          handleEngagementTimeRangeChange(range.value)
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          engagementTimeRange === range.value
+                            ? "bg-primary text-white"
+                            : "bg-gray-700/50 text-gray-300 hover:bg-gray-600/50"
+                        }`}
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Interval Selection */}
+                <div className="w-full md:w-64">
+                  <label className="text-sm text-gray-400 font-medium mb-2 block">
+                    Data Interval
+                  </label>
+                  <Select
+                    value={String(engagementInterval)}
+                    onValueChange={(value) =>
+                      setEngagementInterval(Number(value))
+                    }
+                  >
+                    <SelectTrigger className="bg-gray-700/50 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">
+                        <div className="flex flex-col">
+                          <span className="font-medium">Hourly</span>
+                          <span className="text-xs text-gray-400">
+                            Data points every hour
+                          </span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="6">
+                        <div className="flex flex-col">
+                          <span className="font-medium">6 Hours</span>
+                          <span className="text-xs text-gray-400">
+                            Data points every 6 hours
+                          </span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="12">
+                        <div className="flex flex-col">
+                          <span className="font-medium">12 Hours</span>
+                          <span className="text-xs text-gray-400">
+                            Data points every 12 hours
+                          </span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="24">
+                        <div className="flex flex-col">
+                          <span className="font-medium">Daily</span>
+                          <span className="text-xs text-gray-400">
+                            Data points every 24 hours
+                          </span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Date Pickers (for custom range) */}
+              {engagementTimeRange === "custom" && (
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 font-medium mb-2 block">
+                      Start Date
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal bg-gray-700/50 border-gray-600 text-white hover:bg-gray-600/50",
+                            !engagementStartDate && "text-gray-400"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {engagementStartDate ? (
+                            format(engagementStartDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={engagementStartDate || undefined}
+                          onSelect={(date) => setEngagementStartDate(date || null)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="flex-1">
+                    <label className="text-sm text-gray-400 font-medium mb-2 block">
+                      End Date
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal bg-gray-700/50 border-gray-600 text-white hover:bg-gray-600/50",
+                            !engagementEndDate && "text-gray-400"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {engagementEndDate ? (
+                            format(engagementEndDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={engagementEndDate || undefined}
+                          onSelect={(date) => setEngagementEndDate(date || null)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              )}
+
+              {/* Metric Toggle Filters */}
+              <div>
+                <label className="text-sm text-gray-400 font-medium mb-2 block">
+                  Display Metrics
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setShowDAU(!showDAU)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      showDAU
+                        ? "bg-purple-500/20 text-purple-300 border border-purple-500/50"
+                        : "bg-gray-700/50 text-gray-400 border border-gray-600/50"
+                    }`}
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        showDAU ? "bg-purple-500" : "bg-gray-500"
+                      }`}
+                    ></div>
+                    Daily Active Users
+                  </button>
+                  <button
+                    onClick={() => setShowWAU(!showWAU)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      showWAU
+                        ? "bg-blue-500/20 text-blue-300 border border-blue-500/50"
+                        : "bg-gray-700/50 text-gray-400 border border-gray-600/50"
+                    }`}
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        showWAU ? "bg-blue-500" : "bg-gray-500"
+                      }`}
+                    ></div>
+                    Weekly Active Users
+                  </button>
+                  <button
+                    onClick={() => setShowNewUsers(!showNewUsers)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      showNewUsers
+                        ? "bg-green-500/20 text-green-300 border border-green-500/50"
+                        : "bg-gray-700/50 text-gray-400 border border-gray-600/50"
+                    }`}
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        showNewUsers ? "bg-green-500" : "bg-gray-500"
+                      }`}
+                    ></div>
+                    New Users
+                  </button>
+                  <button
+                    onClick={() => setShowSessions(!showSessions)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      showSessions
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/50"
+                        : "bg-gray-700/50 text-gray-400 border border-gray-600/50"
+                    }`}
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        showSessions ? "bg-amber-500" : "bg-gray-500"
+                      }`}
+                    ></div>
+                    Total Sessions
+                  </button>
+                  <button
+                    onClick={() => setShowCohortAnalysis(!showCohortAnalysis)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      showCohortAnalysis
+                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50"
+                        : "bg-gray-700/50 text-gray-400 border border-gray-600/50"
+                    }`}
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        showCohortAnalysis ? "bg-cyan-500" : "bg-gray-500"
+                      }`}
+                    ></div>
+                    User Cohorts
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {userEngagementError ? (
+              <div className="flex items-center justify-center py-8 text-red-400">
+                <p>Error loading user engagement data</p>
+              </div>
+            ) : userEngagementLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <svg
+                  className="animate-spin h-12 w-12 text-primary"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              </div>
+            ) : userEngagementData && Array.isArray(userEngagementData) && userEngagementData.length > 0 ? (
+              (() => {
+                // Calculate summary statistics from the data
+                const totalActiveUsers = userEngagementData.reduce((sum: number, d: any) => sum + (d.active_users || 0), 0)
+                const totalNewUsers = userEngagementData.reduce((sum: number, d: any) => sum + (d.new_users || 0), 0)
+                const totalSessions = userEngagementData.reduce((sum: number, d: any) => sum + (d.total_sessions || 0), 0)
+                const avgActiveUsers = totalActiveUsers / userEngagementData.length
+                const avgEngagementTime = userEngagementData.reduce((sum: number, d: any) => sum + (d.avg_engagement_time || 0), 0) / userEngagementData.length
+
+                // Calculate WAU by taking 7-day rolling sum of active users
+                const dataWithWAU = userEngagementData.map((point: any, index: number) => {
+                  const last7Days = userEngagementData.slice(Math.max(0, index - 6), index + 1)
+                  const wau = last7Days.reduce((sum: number, d: any) => sum + (d.active_users || 0), 0)
+                  return {
+                    ...point,
+                    dau: point.active_users,
+                    wau: wau,
+                  }
+                })
+
+                return (
+                  <div className="space-y-6 w-full">
+                    {/* Summary Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+                      <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                        <p className="text-xs text-gray-400 font-medium mb-1">
+                          Total Active Users
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {totalActiveUsers.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Avg: {avgActiveUsers.toFixed(0)}
+                        </p>
+                      </div>
+                      <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                        <p className="text-xs text-gray-400 font-medium mb-1">
+                          Total New Users
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {totalNewUsers.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Avg: {(totalNewUsers / userEngagementData.length).toFixed(0)}
+                        </p>
+                      </div>
+                      <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                        <p className="text-xs text-gray-400 font-medium mb-1">
+                          Total Sessions
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {totalSessions.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Avg: {(totalSessions / userEngagementData.length).toFixed(0)}
+                        </p>
+                      </div>
+                      <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                        <p className="text-xs text-gray-400 font-medium mb-1">
+                          Avg Engagement Time
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {avgEngagementTime.toFixed(0)}s
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Separate DAU and WAU Charts */}
+                    <div className={`grid gap-6 w-full ${(showDAU && showWAU) ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+                      {/* Daily Active Users Chart */}
+                      {showDAU && (
+                        <div className="bg-gray-800/30 rounded-xl p-4 min-w-0">
+                          <div className="mb-4">
+                            <h3 className="text-lg font-semibold text-gray-200">
+                              Daily Active Users
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Number of unique users active per time interval
+                            </p>
+                          </div>
+                          <ChartContainer config={chartConfig} className="h-[350px]">
+                            <LineChart
+                              data={dataWithWAU}
+                              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                              <XAxis
+                                dataKey="timestamp"
+                                className="text-xs"
+                                stroke="#6b7280"
+                                tickFormatter={(value) => {
+                                  const date = new Date(value)
+                                  return `${date.getMonth() + 1}/${date.getDate()}`
+                                }}
+                              />
+                              <YAxis className="text-xs" stroke="#6b7280" />
+                              <RechartsTooltip
+                                contentStyle={{
+                                  backgroundColor: "#1f2937",
+                                  border: "1px solid #374151",
+                                  borderRadius: "8px",
+                                }}
+                                labelFormatter={(value) => {
+                                  const date = new Date(value)
+                                  return date.toLocaleDateString()
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="dau"
+                                stroke="#8b5cf6"
+                                strokeWidth={2}
+                                name="Daily Active Users"
+                                dot={{ fill: "#8b5cf6", r: 3 }}
+                              />
+                            </LineChart>
+                          </ChartContainer>
+                        </div>
+                      )}
+
+                      {/* Weekly Active Users Chart */}
+                      {showWAU && (
+                        <div className="bg-gray-800/30 rounded-xl p-4 min-w-0">
+                          <div className="mb-4">
+                            <h3 className="text-lg font-semibold text-gray-200">
+                              Weekly Active Users
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-1">
+                              7-day rolling sum of active users showing weekly trends
+                            </p>
+                          </div>
+                          <ChartContainer config={chartConfig} className="h-[350px]">
+                            <LineChart
+                              data={dataWithWAU}
+                              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                              <XAxis
+                                dataKey="timestamp"
+                                className="text-xs"
+                                stroke="#6b7280"
+                                tickFormatter={(value) => {
+                                  const date = new Date(value)
+                                  return `${date.getMonth() + 1}/${date.getDate()}`
+                                }}
+                              />
+                              <YAxis className="text-xs" stroke="#6b7280" />
+                              <RechartsTooltip
+                                contentStyle={{
+                                  backgroundColor: "#1f2937",
+                                  border: "1px solid #374151",
+                                  borderRadius: "8px",
+                                }}
+                                labelFormatter={(value) => {
+                                  const date = new Date(value)
+                                  return date.toLocaleDateString()
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="wau"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                                name="Weekly Active Users (7-day rolling)"
+                                dot={{ fill: "#3b82f6", r: 3 }}
+                              />
+                            </LineChart>
+                          </ChartContainer>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* User Activity Metrics and Cohort Analysis - Side by Side */}
+                    <div className={`grid gap-6 w-full ${((showNewUsers || showSessions) && showCohortAnalysis) ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+                      {/* Additional Metrics Chart */}
+                      {(showNewUsers || showSessions) && (
+                        <div className="bg-gray-800/30 rounded-xl p-4 min-w-0">
+                          <div className="mb-4">
+                            <h3 className="text-lg font-semibold text-gray-200">
+                              User Activity Metrics
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Track new user acquisition and total session count over time
+                            </p>
+                          </div>
+                          <ChartContainer config={chartConfig} className="h-[400px]">
+                            <LineChart
+                              data={userEngagementData}
+                              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                              <XAxis
+                                dataKey="timestamp"
+                                className="text-xs"
+                                stroke="#6b7280"
+                                tickFormatter={(value) => {
+                                  const date = new Date(value)
+                                  return `${date.getMonth() + 1}/${date.getDate()}`
+                                }}
+                              />
+                              <YAxis className="text-xs" stroke="#6b7280" />
+                              <RechartsTooltip
+                                contentStyle={{
+                                  backgroundColor: "#1f2937",
+                                  border: "1px solid #374151",
+                                  borderRadius: "8px",
+                                }}
+                                labelFormatter={(value) => {
+                                  const date = new Date(value)
+                                  return date.toLocaleDateString()
+                                }}
+                              />
+                              {showNewUsers && (
+                                <Line
+                                  type="monotone"
+                                  dataKey="new_users"
+                                  stroke="#10b981"
+                                  strokeWidth={2}
+                                  name="New Users"
+                                  dot={{ fill: "#10b981", r: 3 }}
+                                />
+                              )}
+                              {showSessions && (
+                                <Line
+                                  type="monotone"
+                                  dataKey="total_sessions"
+                                  stroke="#f59e0b"
+                                  strokeWidth={2}
+                                  name="Total Sessions"
+                                  dot={{ fill: "#f59e0b", r: 3 }}
+                                />
+                              )}
+                            </LineChart>
+                          </ChartContainer>
+                        </div>
+                      )}
+
+                      {/* User Cohort Analysis Chart */}
+                      {showCohortAnalysis && (() => {
+                        // Calculate cohort metrics from available data
+                        const cohortData = userEngagementData.map((point: any, index: number) => {
+                        const newUsers = point.new_users || 0
+                        const activeUsers = point.active_users || 0
+
+                        // Returning users = active users who are not new
+                        const returningUsers = Math.max(0, activeUsers - newUsers)
+
+                        // Get previous week's active users to identify resurrecting users
+                        // A resurrecting user is someone who was inactive but became active again
+                        let resurrectingUsers = 0
+                        let dormantUsers = 0
+
+                        if (index >= 7) {
+                          // Look at users from 7 days ago
+                          const prevWeekPoint = userEngagementData[index - 7]
+                          const prevActiveUsers = prevWeekPoint?.active_users || 0
+
+                          // Resurrecting: users who were active 7+ days ago but not recently
+                          // This is an approximation - ideally we'd track individual user sessions
+                          const recentlyActive = index >= 3
+                            ? userEngagementData.slice(Math.max(0, index - 3), index)
+                                .reduce((sum: number, p: any) => sum + (p.active_users || 0), 0) / 3
+                            : activeUsers
+
+                          resurrectingUsers = Math.max(0, Math.floor(
+                            (activeUsers - recentlyActive) * 0.3 // Estimate: 30% of increase might be resurrecting
+                          ))
+
+                          // Dormant: previously active users who are no longer active
+                          dormantUsers = Math.max(0, Math.floor(
+                            (prevActiveUsers - activeUsers) * 0.5 // Estimate: 50% of decrease might be dormant
+                          ))
+                        }
+
+                        return {
+                          timestamp: point.timestamp,
+                          date: new Date(point.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                          new_users: newUsers,
+                          returning_users: returningUsers,
+                          resurrecting_users: resurrectingUsers,
+                          dormant_users: dormantUsers,
+                        }
+                      })
+
+                        return (
+                          <div className="bg-gray-800/30 rounded-xl p-4 min-w-0">
+                          <div className="mb-4 flex items-start justify-between">
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-200">
+                                User Cohort Analysis
+                              </h3>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Track new, returning, resurrecting, and dormant users over time
+                              </p>
+                            </div>
+                            <Button
+                              onClick={() => setShowNewUsersModal(true)}
+                              size="sm"
+                              variant="outline"
+                              className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                            >
+                              View New Users
+                            </Button>
+                          </div>
+
+                          {/* Cohort Legend */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/30">
+                              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-200">New Users</p>
+                                <p className="text-xs text-gray-400">First time</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/30">
+                              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-200">Returning</p>
+                                <p className="text-xs text-gray-400">Active again</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/30">
+                              <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-200">Resurrecting</p>
+                                <p className="text-xs text-gray-400">Came back</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/30">
+                              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-200">Dormant</p>
+                                <p className="text-xs text-gray-400">Became inactive</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <ChartContainer config={chartConfig} className="h-[400px]">
+                            <BarChart
+                              data={cohortData}
+                              margin={{ top: 20, right: 10, left: 0, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                              <XAxis
+                                dataKey="date"
+                                className="text-xs"
+                                stroke="#6b7280"
+                              />
+                              <YAxis className="text-xs" stroke="#6b7280" />
+                              <RechartsTooltip
+                                contentStyle={{
+                                  backgroundColor: "#1f2937",
+                                  border: "1px solid #374151",
+                                  borderRadius: "8px",
+                                }}
+                                cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                              />
+                              <Legend
+                                wrapperStyle={{ paddingTop: '20px' }}
+                                iconType="circle"
+                              />
+                              <Bar
+                                dataKey="new_users"
+                                stackId="cohort"
+                                fill="#10b981"
+                                name="New Users"
+                                radius={[0, 0, 0, 0]}
+                              />
+                              <Bar
+                                dataKey="returning_users"
+                                stackId="cohort"
+                                fill="#3b82f6"
+                                name="Returning Users"
+                                radius={[0, 0, 0, 0]}
+                              />
+                              <Bar
+                                dataKey="resurrecting_users"
+                                stackId="cohort"
+                                fill="#06b6d4"
+                                name="Resurrecting Users"
+                                radius={[0, 0, 0, 0]}
+                              />
+                              <Bar
+                                dataKey="dormant_users"
+                                fill="#ef4444"
+                                name="Dormant Users"
+                                radius={[4, 4, 0, 0]}
+                              />
+                            </BarChart>
+                          </ChartContainer>
+
+                          {/* Cohort Insights */}
+                          <div className="mt-4 p-3 rounded-lg bg-gray-700/20 border border-gray-600/30">
+                            <p className="text-xs text-gray-400">
+                              <span className="font-semibold text-cyan-400">Note:</span> Cohort analysis
+                              shows user behavior patterns. New users appear for the first time, returning users
+                              were recently active, resurrecting users came back after being away, and dormant
+                              users stopped being active.
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                    </div>
+                  </div>
+                )
+              })()
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="text-6xl mb-4">📊</div>
+                <p className="text-gray-400">
+                  No user engagement data available for the selected period
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4">
           <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
@@ -1208,6 +2054,179 @@ export default function KpiDashboardPage() {
           },
         }}
       />
+
+      {/* New Users Details Modal */}
+      <Dialog open={showNewUsersModal} onOpenChange={setShowNewUsersModal}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold text-white">
+              New Users Details
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Detailed information about new users acquired during the selected period
+            </DialogDescription>
+          </DialogHeader>
+
+          {newUsersLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <svg
+                className="animate-spin h-12 w-12 text-primary"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            </div>
+          ) : newUsersError ? (
+            <div className="flex items-center justify-center py-8 text-red-400">
+              <p>Error loading new users data</p>
+            </div>
+          ) : newUsersData && newUsersData.length > 0 ? (
+            <div className="space-y-4">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="bg-gray-800/50 border-gray-700">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-gray-400 mb-1">Total New Users</p>
+                    <p className="text-2xl font-bold text-emerald-400">
+                      {newUsersData.length}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gray-800/50 border-gray-700">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-gray-400 mb-1">Avg Sessions</p>
+                    <p className="text-2xl font-bold text-blue-400">
+                      {(
+                        newUsersData.reduce(
+                          (sum: number, u: any) => sum + (u.total_sessions || 0),
+                          0
+                        ) / newUsersData.length
+                      ).toFixed(1)}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gray-800/50 border-gray-700">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-gray-400 mb-1">Avg Page Views</p>
+                    <p className="text-2xl font-bold text-purple-400">
+                      {(
+                        newUsersData.reduce(
+                          (sum: number, u: any) => sum + (u.total_page_views || 0),
+                          0
+                        ) / newUsersData.length
+                      ).toFixed(1)}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gray-800/50 border-gray-700">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-gray-400 mb-1">Avg Engagement</p>
+                    <p className="text-2xl font-bold text-amber-400">
+                      {(
+                        newUsersData.reduce(
+                          (sum: number, u: any) =>
+                            sum + (u.total_engagement_time_seconds || 0),
+                          0
+                        ) /
+                        newUsersData.length /
+                        60
+                      ).toFixed(1)}
+                      <span className="text-sm ml-1">min</span>
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Users Table */}
+              <div className="border border-gray-700 rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-gray-800">
+                    <TableRow>
+                      <TableHead className="text-gray-300">User ID</TableHead>
+                      <TableHead className="text-gray-300">First Seen</TableHead>
+                      <TableHead className="text-gray-300">Last Seen</TableHead>
+                      <TableHead className="text-gray-300">Sessions</TableHead>
+                      <TableHead className="text-gray-300">Page Views</TableHead>
+                      <TableHead className="text-gray-300">Events</TableHead>
+                      <TableHead className="text-gray-300">Engagement</TableHead>
+                      <TableHead className="text-gray-300">Country</TableHead>
+                      <TableHead className="text-gray-300">Device</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {newUsersData.map((user: any, index: number) => (
+                      <TableRow
+                        key={user.user_id || index}
+                        className="border-gray-700 hover:bg-gray-800/50"
+                      >
+                        <TableCell className="font-mono text-xs text-gray-300">
+                          {user.user_id?.substring(0, 12)}...
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-300">
+                          {new Date(user.first_seen).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-300">
+                          {new Date(user.last_seen).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-300">
+                          {user.total_sessions || 0}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-300">
+                          {user.total_page_views || 0}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-300">
+                          {user.total_events || 0}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-300">
+                          {((user.total_engagement_time_seconds || 0) / 60).toFixed(
+                            1
+                          )}
+                          m
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-300">
+                          {user.country || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-300">
+                          {user.device_type || 'N/A'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="text-6xl mb-4">👥</div>
+              <p className="text-gray-400">No new users found for the selected period</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

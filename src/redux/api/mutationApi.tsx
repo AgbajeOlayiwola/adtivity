@@ -113,6 +113,27 @@ export const mutationApi = createApi({
         method: "DELETE",
       }),
     }),
+    forgotPassword: builder.mutation({
+      query: (body: { email: string }) => ({
+        url: "/auth/forgot-password",
+        method: "POST",
+        body,
+      }),
+    }),
+    resetPassword: builder.mutation({
+      query: (body: { token: string; new_password: string }) => ({
+        url: "/auth/reset-password",
+        method: "POST",
+        body,
+      }),
+    }),
+    changePassword: builder.mutation({
+      query: (body: { current_password: string; new_password: string }) => ({
+        url: "/auth/change-password",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 })
 
@@ -124,4 +145,7 @@ export const {
   usePlatformUserLoginMutation,
   useCreateClientCompanyMutation,
   useValidateTwitterMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useChangePasswordMutation,
 } = mutationApi
