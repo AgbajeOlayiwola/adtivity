@@ -137,12 +137,7 @@ function StickySelect({
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent
-        className={contentClassName}
-        onInteractOutside={() => setOpen(false)}
-        onEscapeKeyDown={() => setOpen(false)}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
+      <SelectContent className={contentClassName}>
         {children}
       </SelectContent>
     </Select>
@@ -1268,8 +1263,8 @@ export default function KpiDashboardPage() {
                       )}
                     </div>
 
-                    {/* User Activity Metrics and Cohort Analysis - Side by Side */}
-                    <div className={`grid gap-6 w-full ${((showNewUsers || showSessions) && showCohortAnalysis) ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+                    {/* User Activity Metrics and Cohort Analysis - Vertical Stack */}
+                    <div className="grid gap-6 w-full grid-cols-1">
                       {/* Additional Metrics Chart */}
                       {(showNewUsers || showSessions) && (
                         <div className="bg-gray-800/30 rounded-xl p-4 min-w-0">

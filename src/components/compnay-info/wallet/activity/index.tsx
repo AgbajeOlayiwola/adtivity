@@ -301,7 +301,7 @@ export default function WalletActivityModal({
     data: walletBalanceData,
     isLoading: walletBalanceLoading,
     isError: walletBalanceError,
-  } = useWalletBalanceQuery(
+  }: any = useWalletBalanceQuery(
     {
       walletAddress: wallet?.wallet_address,
       network: wallet?.network,
