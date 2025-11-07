@@ -1,4 +1,5 @@
 "use client"
+import KOLAnalysisModal from "@/components/kol-analysis-modal"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -21,7 +22,6 @@ import { FaPlus } from "react-icons/fa6"
 import { MdAnalytics, MdClose } from "react-icons/md"
 import { useDispatch, useSelector } from "react-redux"
 import { z } from "zod"
-import KOLAnalysisModal from "@/components/kol-analysis-modal"
 
 const nameSchema = z.object({
   companyName: z.string({ message: "Invalid name address." }),
@@ -82,16 +82,7 @@ const Dashboard = () => {
   return (
     <>
       <div className="flex items-center justify-between mb-6">
-        <p>
-          Number of companies registered{" "}
-          {profile?.payload?.client_companies?.length || 0}
-        </p>
-        <Button
-          onClick={() => setKolModalOpen(true)}
-          className="cursor-target bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 py-3 shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-primary/50 transform hover:scale-105"
-        >
-          KOL Analysis
-        </Button>
+        <p>Number of companies registered {profile?.companies?.length || 0}</p>
       </div>
       <br />{" "}
       <div className="flex gap-5 flex-wrap w-[100%]">
@@ -182,7 +173,6 @@ const Dashboard = () => {
         ) : null}
         <div></div>
       </div>
-
       {/* KOL Analysis Modal */}
       <KOLAnalysisModal
         open={kolModalOpen}

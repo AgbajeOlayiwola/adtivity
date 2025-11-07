@@ -134,6 +134,46 @@ export const mutationApi = createApi({
         body,
       }),
     }),
+    analyzeKOL: builder.mutation({
+      query: (body: { username: string; max_tweets?: number; max_mentions?: number }) => ({
+        url: "/twitter/kol/analyze",
+        method: "POST",
+        body,
+      }),
+    }),
+    getKOLRecommendation: builder.mutation({
+      // Use queryFn to bypass baseQuery and call Next.js API directly
+      queryFn: async (arg: {
+        kol_data: any;
+        brand_goals: string[];
+        additional_context?: string;
+      }) => {
+        try {
+          const result = await fetch("/api/kol-recommendation", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(arg),
+          })
+
+          if (!result.ok) {
+            const error = await result.json()
+            return { error }
+          }
+
+          const data = await result.json()
+          return { data }
+        } catch (error: any) {
+          return {
+            error: {
+              status: 500,
+              data: { error: error?.message || "Failed to get recommendation" },
+            },
+          }
+        }
+      },
+    }),
   }),
 })
 
@@ -148,4 +188,6 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useChangePasswordMutation,
+  useAnalyzeKOLMutation,
+  useGetKOLRecommendationMutation,
 } = mutationApi

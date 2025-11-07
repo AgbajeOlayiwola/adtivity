@@ -5,60 +5,12 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   useAutocompleteTwitterUserQuery,
-  useTweetsQuery,
-  useTwitterFollowersQuery,
-  useTwitterMentionsAnalyticsQuery,
 } from "@/redux/api/queryApi"
-import { useCreateTwitterAccountsMutation } from "@/redux/api/mutationApi"
-import { AlertCircle, X } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
-import { useSelector } from "react-redux"
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from "recharts"
+import { useAnalyzeKOLMutation, useGetKOLRecommendationMutation } from "@/redux/api/mutationApi"
+import { AlertCircle, X, Sparkles } from "lucide-react"
+import { useState } from "react"
 
 // ---------------------- helpers ----------------------
-const transformMentions = (
-  mentionsByDate: Record<string, number> | Array<any> | undefined
-) => {
-  if (Array.isArray(mentionsByDate)) {
-    return mentionsByDate.map((item) => ({
-      date: item.date || "Unknown",
-      mentions: item.mentions ?? 0,
-      likes: item.likes ?? 0,
-    }))
-  }
-  if (!mentionsByDate || Object.keys(mentionsByDate).length === 0) return []
-  return Object.keys(mentionsByDate).map((date) => ({
-    date,
-    mentions: mentionsByDate[date] ?? 0,
-  }))
-}
-
-const transformFollowers = (
-  followersByDate: Record<string, number> | Array<any> | undefined
-) => {
-  if (Array.isArray(followersByDate)) {
-    return followersByDate.map((item) => ({
-      date: item.date || "Unknown",
-      followers: item.followers ?? 0,
-    }))
-  }
-  if (!followersByDate || Object.keys(followersByDate).length === 0) return []
-  return Object.keys(followersByDate).map((date) => ({
-    date,
-    followers: followersByDate[date] ?? 0,
-  }))
-}
-
 const safeToLocale = (n?: number) =>
   typeof n === "number" && Number.isFinite(n) ? n.toLocaleString() : "N/A"
 
@@ -72,56 +24,40 @@ export default function KOLAnalysisModal({
   onClose,
 }: KOLAnalysisModalProps) {
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedTwitterId, setSelectedTwitterId] = useState<string | null>(
-    null
-  )
   const [selectedUsername, setSelectedUsername] = useState<string>("")
   const [selectedUser, setSelectedUser] = useState<any>(null)
-  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(
-    null
-  )
-  const [selectedCompanyName, setSelectedCompanyName] =
-    useState("Select a company")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Date range state - default to start of month to current date
-  const getDefaultStartDate = () => {
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    return firstDay.toISOString().split("T")[0]
-  }
+  // KOL Analysis state
+  const [maxTweets, setMaxTweets] = useState(10)
+  const [maxMentions, setMaxMentions] = useState(100)
+  const [kolAnalysisData, setKolAnalysisData] = useState<any>(null)
 
-  const getCurrentDate = () => {
-    return new Date().toISOString().split("T")[0]
-  }
+  // AI Recommendation state
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([])
+  const [additionalContext, setAdditionalContext] = useState("")
+  const [aiRecommendation, setAiRecommendation] = useState<any>(null)
+  const [showGoalsSection, setShowGoalsSection] = useState(false)
 
-  const [startDate, setStartDate] = useState(getDefaultStartDate())
-  const [endDate, setEndDate] = useState(getCurrentDate())
-
-  // Get companies from profile slice
-  const { profile }: any = useSelector((store) => store)
-  const companies = profile?.companies || []
-
-  // Create Twitter Account mutation
+  // KOL Analysis mutation
   const [
-    createTwitterAccounts,
+    analyzeKOL,
     {
-      isLoading: createTwitterAccountsLoad,
-      isSuccess: createTwitterAccountsSuccess,
-      isError: createTwitterAccountsFalse,
-      error: createTwitterAccountsErr,
+      isLoading: analyzeKOLLoading,
+      isSuccess: analyzeKOLSuccess,
+      isError: analyzeKOLError,
+      error: analyzeKOLErrorData,
     },
-  ]: any = useCreateTwitterAccountsMutation()
+  ]: any = useAnalyzeKOLMutation()
 
-  // Debug companies
-  useEffect(() => {
-    console.log("Companies from profile:", {
-      profile,
-      companies,
-      twitter_companies: profile?.twitter_companies,
-    })
-  }, [profile, companies])
+  // AI Recommendation mutation
+  const [
+    getKOLRecommendation,
+    {
+      isLoading: recommendationLoading,
+      isError: recommendationError,
+    },
+  ]: any = useGetKOLRecommendationMutation()
 
   // Autocomplete search
   const { data: autocompleteData, isLoading: autocompleteLoading }: any =
@@ -132,132 +68,97 @@ export default function KOLAnalysisModal({
       }
     )
 
-  // Fetch analytics for selected user
-  const {
-    data: analyticsData,
-    isLoading: analyticsLoad,
-    isSuccess: analyticsSuccess,
-    isError: analyticsError,
-    error: analyticsErrorData,
-  }: any = useTwitterMentionsAnalyticsQuery(
-    { twitterId: selectedTwitterId, startDate, endDate },
-    {
-      skip: !selectedTwitterId,
-    }
-  )
-
-  const { data: followersData, isLoading: followersLoad, isError: followersError, error: followersErrorData }: any =
-    useTwitterFollowersQuery(
-      { twitterId: selectedTwitterId },
-      {
-        skip: !selectedTwitterId,
-      }
-    )
-
-  const { data: tweetsData, isLoading: tweetsLoad, isError: tweetsError, error: tweetsErrorData }: any = useTweetsQuery(
-    { twitterId: selectedTwitterId },
-    {
-      skip: !selectedTwitterId,
-    }
-  )
-
-  console.log("=== QUERY STATUS ===", {
-    selectedTwitterId,
-    analyticsQuery: {
-      data: analyticsData,
-      isLoading: analyticsLoad,
-      isSuccess: analyticsSuccess,
-      isError: analyticsError,
-      error: analyticsErrorData,
-    },
-    followersQuery: {
-      data: followersData,
-      isLoading: followersLoad,
-      isError: followersError,
-      error: followersErrorData,
-    },
-    tweetsQuery: {
-      data: tweetsData,
-      isLoading: tweetsLoad,
-      isError: tweetsError,
-      error: tweetsErrorData,
-    },
-  })
-
   const handleUserSelect = (user: any) => {
     setSelectedUser(user)
     setSelectedUsername(user.username)
     setSearchQuery("")
-    setShowCompanyDropdown(true)
     setErrorMessage(null)
   }
 
-  const handleAnalyzeAccount = async () => {
-    if (!selectedCompanyId) {
-      setErrorMessage("Please select a company to add the account to.")
+  const handleClearSelection = () => {
+    setSelectedUsername("")
+    setSelectedUser(null)
+    setErrorMessage(null)
+    setKolAnalysisData(null)
+    setSearchQuery("")
+    setAiRecommendation(null)
+    setSelectedGoals([])
+    setAdditionalContext("")
+    setShowGoalsSection(false)
+  }
+
+  const handleGoalToggle = (goal: string) => {
+    setSelectedGoals(prev =>
+      prev.includes(goal)
+        ? prev.filter(g => g !== goal)
+        : [...prev, goal]
+    )
+  }
+
+  const handleGetAIRecommendation = async () => {
+    if (!kolAnalysisData) {
+      setErrorMessage("Please analyze a KOL first.")
       return
     }
 
-    if (!selectedUser) {
-      setErrorMessage("Please select a Twitter user first.")
+    if (selectedGoals.length === 0) {
+      setErrorMessage("Please select at least one brand goal.")
       return
     }
-
-    console.log("=== DEBUG: handleAnalyzeAccount ===")
-    console.log("selectedUser:", selectedUser)
-    console.log("selectedCompanyId:", selectedCompanyId)
-    console.log("selectedUsername:", selectedUsername)
 
     try {
-      // Create Twitter account with the selected company
-      const payload = {
-        twitter_handle: selectedUsername,
-        description: selectedUser.description || selectedUser.name || "",
-        company_id: selectedCompanyId,
-      }
+      const response = await getKOLRecommendation({
+        kol_data: kolAnalysisData,
+        brand_goals: selectedGoals,
+        additional_context: additionalContext || undefined,
+      }).unwrap()
 
-      console.log("Creating Twitter account with payload:", payload)
-
-      const response = await createTwitterAccounts(payload).unwrap()
-
-      console.log("=== CREATE TWITTER ACCOUNT RESPONSE ===")
-      console.log("Full response:", response)
-      console.log("twitter_id from response:", response?.id || response?.twitter_id)
-
-      // Extract twitter_id from response
-      const twitterId = response?.id || response?.twitter_id
-
-      if (!twitterId) {
-        console.error("No twitter_id found in response:", response)
-        setErrorMessage(
-          "Failed to create Twitter account. No twitter_id returned."
-        )
-        return
-      }
-
-      // Set the twitter_id to trigger analytics fetching
-      console.log("Setting selectedTwitterId to:", twitterId)
-      setSelectedTwitterId(twitterId)
-      setShowCompanyDropdown(false)
+      setAiRecommendation(response)
       setErrorMessage(null)
+      setShowGoalsSection(false)
     } catch (error: any) {
-      console.error("Error creating Twitter account:", error)
+      console.error("Error getting AI recommendation:", error)
       setErrorMessage(
-        error?.data?.message ||
+        error?.data?.error ||
+          error?.data?.message ||
           error?.message ||
-          "Failed to create Twitter account. Please try again."
+          "Failed to get AI recommendation. Please try again."
       )
     }
   }
 
-  const handleClearSelection = () => {
-    setSelectedTwitterId(null)
-    setSelectedUsername("")
-    setSelectedUser(null)
-    setShowCompanyDropdown(false)
-    setSelectedCompanyId(null)
-    setSelectedCompanyName("Select a company")
-    setErrorMessage(null)
+  const handleAnalyzeKOL = async () => {
+    if (!selectedUsername) {
+      setErrorMessage("Please select a Twitter user first.")
+      return
+    }
+
+    try {
+      console.log("=== ANALYZING KOL ===")
+      console.log("Username:", selectedUsername)
+      console.log("Max Tweets:", maxTweets)
+      console.log("Max Mentions:", maxMentions)
+
+      const response = await analyzeKOL({
+        username: selectedUsername,
+        max_tweets: maxTweets,
+        max_mentions: maxMentions,
+      }).unwrap()
+
+      console.log("=== KOL ANALYSIS RESPONSE ===")
+      console.log("Full response:", response)
+
+      setKolAnalysisData(response)
+      setErrorMessage(null)
+    } catch (error: any) {
+      console.error("Error analyzing KOL:", error)
+      setErrorMessage(
+        error?.data?.error ||
+          error?.data?.message ||
+          error?.message ||
+          "Failed to analyze KOL. Please try again."
+      )
+    }
   }
 
   const handleClose = () => {
@@ -268,116 +169,6 @@ export default function KOLAnalysisModal({
     // Call the parent onClose
     onClose()
   }
-
-  // -------- Derived series --------
-  const mentionsSeries = useMemo(
-    () => transformMentions(analyticsData?.mentions_by_date),
-    [analyticsData]
-  )
-
-  const followerSeries = useMemo(
-    () => transformFollowers(analyticsData?.followers_by_date),
-    [analyticsData]
-  )
-
-  // -------- Derived KPIs --------
-  const totals = useMemo(() => {
-    const totalsObj = analyticsData?.totals || analyticsData || {}
-    const totalMentions =
-      totalsObj.total_mentions ??
-      (Array.isArray(mentionsSeries)
-        ? mentionsSeries.reduce((s: number, d: any) => s + (d.mentions || 0), 0)
-        : undefined)
-
-    const posts: any[] = Array.isArray(analyticsData?.posts)
-      ? analyticsData.posts
-      : Array.isArray(analyticsData?.top_posts)
-      ? analyticsData.top_posts
-      : []
-
-    const postCount = posts.length || analyticsData?.post_count
-    const sum = (k: string) =>
-      posts.reduce((acc, p) => acc + (Number(p?.[k]) || 0), 0)
-
-    const totalLikes =
-      totalsObj.total_likes ?? (posts.length ? sum("likes") : undefined)
-    const totalReplies =
-      totalsObj.total_replies ?? (posts.length ? sum("replies") : undefined)
-    const totalReposts =
-      totalsObj.total_reposts ?? (posts.length ? sum("reposts") : undefined)
-    const totalEngagements =
-      Number(totalLikes || 0) +
-        Number(totalReplies || 0) +
-        Number(totalReposts || 0) || undefined
-
-    const impressions =
-      totalsObj.total_impressions ??
-      (posts.length ? sum("impressions") : undefined)
-
-    const totalFollowers =
-      totalsObj.total_followers ?? analyticsData?.total_followers
-
-    const linkClicks =
-      totalsObj.link_clicks ??
-      analyticsData?.link_clicks ??
-      (posts.length ? sum("link_clicks") : undefined)
-
-    const engagementRate =
-      postCount && Number(postCount) > 0
-        ? ((Number(totalEngagements || 0) / Number(postCount)) * 100).toFixed(2)
-        : undefined
-
-    const followerGrowth = (() => {
-      if (!analyticsData?.followers_by_date) return undefined
-      const points = followerSeries
-      if (!points.length) return undefined
-      const first = points[0]?.followers
-      const last = points[points.length - 1]?.followers
-      if (
-        typeof first !== "number" ||
-        typeof last !== "number" ||
-        !Number.isFinite(first) ||
-        !Number.isFinite(last)
-      ) {
-        return undefined
-      }
-      return {
-        abs: last - first,
-        pct:
-          first > 0 ? (((last - first) / first) * 100).toFixed(2) : undefined,
-      }
-    })()
-
-    return {
-      totalMentions,
-      totalLikes,
-      totalReplies,
-      totalReposts,
-      totalEngagements,
-      postCount,
-      impressions,
-      linkClicks,
-      totalFollowers,
-      engagementRate,
-      followerGrowth,
-      postsForRanking: posts,
-    }
-  }, [analyticsData, mentionsSeries, followerSeries])
-
-  const topPosts = useMemo(() => {
-    const posts = totals.postsForRanking
-    if (!Array.isArray(posts) || posts.length === 0) return []
-    const withScore = posts.map((p: any) => ({
-      ...p,
-      engagement:
-        Number(p?.likes || 0) +
-        Number(p?.replies || 0) +
-        Number(p?.reposts || 0),
-    }))
-    return withScore
-      .sort((a: any, b: any) => b.engagement - a.engagement)
-      .slice(0, 10)
-  }, [totals.postsForRanking])
 
   if (!open) return null
 
@@ -469,15 +260,14 @@ export default function KOLAnalysisModal({
           </div>
 
           {/* Selected User Display & Company Selection */}
-          {selectedUsername && (
+          {selectedUsername && !kolAnalysisData && (
             <div className="mt-4 space-y-4">
               <div className="flex items-center justify-between bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
                 <div>
                   <p className="text-white font-medium">
-                    {selectedTwitterId ? "Analyzing: " : "Selected: "}
-                    <span className="text-primary">@{selectedUsername}</span>
+                    Selected: <span className="text-primary">@{selectedUsername}</span>
                   </p>
-                  {selectedUser && !selectedTwitterId && (
+                  {selectedUser && (
                     <p className="text-sm text-gray-400 mt-1">
                       {selectedUser.followers_count?.toLocaleString()} followers
                     </p>
@@ -492,406 +282,479 @@ export default function KOLAnalysisModal({
                 </Button>
               </div>
 
-              {/* Company Selection List */}
-              {showCompanyDropdown && !selectedTwitterId && (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-400">
-                    To view analytics, please add this account to a company:
-                  </p>
-
-                  {/* Company List */}
-                  <div className="space-y-2">
-                    {companies && companies.length > 0 ? (
-                      companies.map((company: any) => (
-                        <button
-                          key={company.id}
-                          onClick={() => {
-                            setSelectedCompanyId(company.id)
-                            setSelectedCompanyName(company.name)
-                          }}
-                          className={`w-full text-left px-4 py-3 rounded-lg border transition-all ${
-                            selectedCompanyId === company.id
-                              ? "bg-primary/20 border-primary text-white"
-                              : "bg-gray-800/50 border-gray-700/50 text-gray-300 hover:bg-gray-700/50 hover:border-gray-600"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{company.name}</span>
-                            {selectedCompanyId === company.id && (
-                              <span className="text-primary text-sm">✓</span>
-                            )}
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="text-center py-4 text-gray-400 text-sm">
-                        No companies available
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    onClick={handleAnalyzeAccount}
-                    disabled={!selectedCompanyId || createTwitterAccountsLoad}
-                    className="w-full bg-primary hover:bg-primary/90"
-                  >
-                    {createTwitterAccountsLoad ? (
-                      <span className="flex items-center gap-2">
-                        <svg
-                          className="animate-spin h-4 w-4"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        Creating Account...
-                      </span>
-                    ) : (
-                      "View Analytics"
-                    )}
-                  </Button>
-
-                  {errorMessage && (
-                    <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                      <p>{errorMessage}</p>
-                    </div>
-                  )}
+              {/* KOL Analysis Section */}
+              <div className="space-y-3 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-700/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🤖</span>
+                  <h3 className="text-white font-semibold">AI-Powered KOL Analysis</h3>
                 </div>
-              )}
+                <p className="text-sm text-gray-300">
+                  Analyze this user's Twitter activity, engagement, and influence.
+                </p>
+
+                {/* Tweet Count Selector */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-300 flex items-center gap-2">
+                    <span>Number of Tweets to Analyze</span>
+                    <span className="text-xs text-gray-500">(min: 10, max: 100)</span>
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="10"
+                      max="100"
+                      step="10"
+                      value={maxTweets}
+                      onChange={(e) => setMaxTweets(Number(e.target.value))}
+                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                    <span className="text-white font-semibold min-w-[40px] text-center">
+                      {maxTweets}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mentions Count Selector */}
+                <div className="space-y-2">
+                  <label className="text-sm text-gray-300 flex items-center gap-2">
+                    <span>Number of Mentions to Analyze</span>
+                    <span className="text-xs text-gray-500">(default: 100)</span>
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="10"
+                      max="200"
+                      step="10"
+                      value={maxMentions}
+                      onChange={(e) => setMaxMentions(Number(e.target.value))}
+                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    />
+                    <span className="text-white font-semibold min-w-[40px] text-center">
+                      {maxMentions}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Analyze Button */}
+                <Button
+                  onClick={handleAnalyzeKOL}
+                  disabled={!selectedUsername || analyzeKOLLoading}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  {analyzeKOLLoading ? (
+                    <span className="flex items-center gap-2">
+                      <svg
+                        className="animate-spin h-4 w-4"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Analyzing...
+                    </span>
+                  ) : (
+                    "🤖 Analyze KOL"
+                  )}
+                </Button>
+
+                {errorMessage && (
+                  <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <p>{errorMessage}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         {/* Analytics Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-200px)] p-6">
-          {!selectedTwitterId ? (
+          {/* KOL Analysis Results */}
+          {kolAnalysisData && (
+            <div className="mb-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <span>🤖</span> KOL Analysis Results
+                </h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setKolAnalysisData(null)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  Clear Results
+                </Button>
+              </div>
+
+              {/* Profile Information */}
+              {kolAnalysisData.profile && (
+                <Card className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 border-gray-700/50">
+                  <div className="p-6">
+                    <div className="flex items-start gap-4">
+                      {kolAnalysisData.profile.profile_image_url && (
+                        <img
+                          src={kolAnalysisData.profile.profile_image_url}
+                          alt={kolAnalysisData.profile.name}
+                          className="w-16 h-16 rounded-full border-2 border-primary"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-bold text-white">
+                            {kolAnalysisData.profile.name}
+                          </h3>
+                          {kolAnalysisData.profile.verified && (
+                            <span className="text-blue-500">✓</span>
+                          )}
+                        </div>
+                        <p className="text-gray-400">@{kolAnalysisData.profile.username}</p>
+                        {kolAnalysisData.profile.description && (
+                          <p className="text-gray-300 mt-2">{kolAnalysisData.profile.description}</p>
+                        )}
+                        <div className="flex gap-6 mt-3 text-sm">
+                          <div>
+                            <span className="text-gray-400">Followers:</span>
+                            <span className="text-white font-semibold ml-1">
+                              {safeToLocale(kolAnalysisData.profile.followers_count)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">Following:</span>
+                            <span className="text-white font-semibold ml-1">
+                              {safeToLocale(kolAnalysisData.profile.following_count)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">Tweets:</span>
+                            <span className="text-white font-semibold ml-1">
+                              {safeToLocale(kolAnalysisData.profile.tweets_count)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Analysis Summary */}
+              {kolAnalysisData.analysis_summary && Object.keys(kolAnalysisData.analysis_summary).length > 0 && (
+                <Card className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border-blue-700/30">
+                  <div className="p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <span>📊</span> Analysis Summary
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {Object.entries(kolAnalysisData.analysis_summary)
+                        .filter(([key]) => !['top_performing_tweets', 'top_hashtags', 'errors'].includes(key))
+                        .map(([key, value]) => (
+                          <div key={key} className="bg-gray-800/50 rounded-lg p-4">
+                            <p className="text-xs text-gray-400 uppercase tracking-wider">
+                              {key.replace(/_/g, ' ')}
+                            </p>
+                            <p className="text-lg font-semibold text-white mt-1">
+                              {typeof value === 'number' ? safeToLocale(value) :
+                               typeof value === 'boolean' ? (value ? 'Yes' : 'No') :
+                               String(value)}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Tweets & Mentions Count */}
+              <div className="grid grid-cols-2 gap-4">
+                {kolAnalysisData.user_tweets && (
+                  <Card className="bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border-emerald-700/30">
+                    <div className="p-6">
+                      <h3 className="text-sm text-gray-400">Analyzed Tweets</h3>
+                      <p className="text-3xl font-bold text-white mt-2">
+                        {Array.isArray(kolAnalysisData.user_tweets) ? kolAnalysisData.user_tweets.length : 0}
+                      </p>
+                    </div>
+                  </Card>
+                )}
+                {kolAnalysisData.mentions && (
+                  <Card className="bg-gradient-to-br from-orange-900/20 to-red-900/20 border-orange-700/30">
+                    <div className="p-6">
+                      <h3 className="text-sm text-gray-400">Analyzed Mentions</h3>
+                      <p className="text-3xl font-bold text-white mt-2">
+                        {Array.isArray(kolAnalysisData.mentions) ? kolAnalysisData.mentions.length : 0}
+                      </p>
+                    </div>
+                  </Card>
+                )}
+              </div>
+
+              {/* Top Performing Tweets */}
+              {kolAnalysisData.analysis_summary?.top_performing_tweets &&
+                Array.isArray(kolAnalysisData.analysis_summary.top_performing_tweets) &&
+                kolAnalysisData.analysis_summary.top_performing_tweets.length > 0 && (
+                <Card className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border-purple-700/30">
+                  <div className="p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <span>🔥</span> Top Performing Tweets
+                    </h3>
+                    <div className="space-y-3">
+                      {kolAnalysisData.analysis_summary.top_performing_tweets.map((tweet: any, index: number) => (
+                        <div key={tweet.tweet_id || index} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                              <span className="text-purple-400 font-semibold text-sm">#{index + 1}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-gray-300 text-sm mb-3 line-clamp-3">{tweet.text}</p>
+                              <div className="flex items-center gap-4 text-xs">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-gray-400">❤️</span>
+                                  <span className="text-white font-medium">{safeToLocale(tweet.likes)}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-gray-400">🔄</span>
+                                  <span className="text-white font-medium">{safeToLocale(tweet.retweets)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Error Display */}
+              {kolAnalysisData.error && (
+                <div className="flex items-center gap-2 text-amber-400 text-sm bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">Note:</p>
+                    <p>{kolAnalysisData.error}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Recommendation Button */}
+              {!aiRecommendation && !showGoalsSection && (
+                <div className="flex justify-center">
+                  <Button
+                    onClick={() => setShowGoalsSection(true)}
+                    className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Get AI Brand Fit Recommendation
+                  </Button>
+                </div>
+              )}
+
+              {/* Goals Selection Section */}
+              {showGoalsSection && !aiRecommendation && (
+                <Card className="bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border-indigo-700/30">
+                  <div className="p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-purple-400" />
+                      What are your brand goals?
+                    </h3>
+                    <p className="text-sm text-gray-300 mb-4">
+                      Select your primary goals to get a personalized AI recommendation
+                    </p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                      {[
+                        { id: "brand_awareness", label: "Brand Awareness", icon: "👁️" },
+                        { id: "engagement", label: "Engagement", icon: "💬" },
+                        { id: "customer_acquisition", label: "Customer Acquisition", icon: "🎯" },
+                        { id: "sales_conversion", label: "Sales & Conversion", icon: "💰" },
+                        { id: "community_growth", label: "Community Growth", icon: "🌱" },
+                        { id: "thought_leadership", label: "Thought Leadership", icon: "🧠" },
+                      ].map((goal) => (
+                        <button
+                          key={goal.id}
+                          onClick={() => handleGoalToggle(goal.id)}
+                          className={`p-3 rounded-lg border transition-all ${
+                            selectedGoals.includes(goal.id)
+                              ? "bg-purple-600/30 border-purple-500 text-white"
+                              : "bg-gray-800/50 border-gray-700/50 text-gray-300 hover:border-purple-700/50"
+                          }`}
+                        >
+                          <div className="text-2xl mb-1">{goal.icon}</div>
+                          <div className="text-xs font-medium">{goal.label}</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="text-sm text-gray-300 mb-2 block">
+                        Additional Context (Optional)
+                      </label>
+                      <textarea
+                        value={additionalContext}
+                        onChange={(e) => setAdditionalContext(e.target.value)}
+                        placeholder="e.g., We're a tech startup targeting Gen Z, looking for authentic voices in crypto/web3..."
+                        className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg p-3 text-white placeholder:text-gray-500 focus:border-purple-500 focus:outline-none resize-none"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={handleGetAIRecommendation}
+                        disabled={selectedGoals.length === 0 || recommendationLoading}
+                        className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      >
+                        {recommendationLoading ? (
+                          <span className="flex items-center gap-2">
+                            <svg
+                              className="animate-spin h-4 w-4"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            Analyzing...
+                          </span>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Get AI Recommendation
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowGoalsSection(false)
+                          setSelectedGoals([])
+                          setAdditionalContext("")
+                        }}
+                        variant="outline"
+                        className="text-gray-400 hover:text-white"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* AI Recommendation Display */}
+              {aiRecommendation && (
+                <Card className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border-green-700/30">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-green-400" />
+                        AI Brand Fit Analysis
+                      </h3>
+                      <Button
+                        onClick={() => {
+                          setAiRecommendation(null)
+                          setSelectedGoals([])
+                          setAdditionalContext("")
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="text-gray-400 hover:text-white"
+                      >
+                        Get New Recommendation
+                      </Button>
+                    </div>
+
+                    {aiRecommendation.recommendation && (
+                      <div className="prose prose-invert max-w-none">
+                        <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
+                          <p className="text-gray-300 whitespace-pre-wrap leading-relaxed">
+                            {aiRecommendation.recommendation}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {aiRecommendation.fit_score !== undefined && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-gray-400">Brand Fit Score</span>
+                          <span className="text-lg font-bold text-white">
+                            {aiRecommendation.fit_score}/10
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-700 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${(aiRecommendation.fit_score / 10) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {aiRecommendation.strengths && aiRecommendation.strengths.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-green-400 mb-2">✓ Strengths</h4>
+                        <ul className="space-y-1">
+                          {aiRecommendation.strengths.map((strength: string, idx: number) => (
+                            <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                              <span className="text-green-400 mt-0.5">•</span>
+                              <span>{strength}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {aiRecommendation.concerns && aiRecommendation.concerns.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-amber-400 mb-2">⚠ Concerns</h4>
+                        <ul className="space-y-1">
+                          {aiRecommendation.concerns.map((concern: string, idx: number) => (
+                            <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                              <span className="text-amber-400 mt-0.5">•</span>
+                              <span>{concern}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {!kolAnalysisData && (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="text-6xl mb-4">🔍</div>
               <p className="text-xl text-gray-400">
-                Search for a Twitter user to view their analytics
+                Search for a Twitter user and analyze their KOL metrics
               </p>
-            </div>
-          ) : analyticsLoad ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center">
-                <svg
-                  className="animate-spin h-12 w-12 text-primary mx-auto mb-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                <p className="text-gray-400">Loading analytics...</p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Date Range */}
-              <div className="flex items-center gap-3 bg-gray-800/80 backdrop-blur rounded-xl p-3 border border-gray-700/50">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-400 font-medium">
-                    From:
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    max={getCurrentDate()}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="bg-gray-900/90 text-gray-200 text-sm rounded-lg px-3 py-1.5 border border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                  />
-                </div>
-                <span className="text-gray-500">→</span>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-400 font-medium">
-                    To:
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    max={getCurrentDate()}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="bg-gray-900/90 text-gray-200 text-sm rounded-lg px-3 py-1.5 border border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* KPIs */}
-              <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="text-lg font-semibold text-gray-400">
-                    Total Mentions
-                  </h3>
-                  <p className="text-4xl font-bold mt-2 text-gray-50">
-                    {safeToLocale(totals.totalMentions)}
-                  </p>
-                </div>
-
-                {typeof totals.totalLikes === "number" && (
-                  <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                    <h3 className="text-lg font-semibold text-gray-400">
-                      Total Likes
-                    </h3>
-                    <p className="text-4xl font-bold mt-2 text-gray-50">
-                      {safeToLocale(totals.totalLikes)}
-                    </p>
-                  </div>
-                )}
-
-                {typeof totals.totalFollowers === "number" && (
-                  <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                    <h3 className="text-lg font-semibold text-gray-400">
-                      Total Followers
-                    </h3>
-                    <p className="text-4xl font-bold mt-2 text-gray-50">
-                      {safeToLocale(totals.totalFollowers)}
-                    </p>
-                    {totals.followerGrowth?.abs !== undefined && (
-                      <p className="text-sm text-gray-400 mt-1">
-                        {totals.followerGrowth.abs >= 0 ? (
-                          <span className="text-green-400">
-                            ↗ +{safeToLocale(totals.followerGrowth.abs)}
-                            {totals.followerGrowth.pct &&
-                              ` (${totals.followerGrowth.pct}%)`}
-                          </span>
-                        ) : (
-                          <span className="text-red-400">
-                            ↘ {safeToLocale(totals.followerGrowth.abs)}
-                            {totals.followerGrowth.pct &&
-                              ` (${totals.followerGrowth.pct}%)`}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {typeof totals.engagementRate === "string" && (
-                  <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                    <h3 className="text-lg font-semibold text-gray-400">
-                      Engagement Rate
-                    </h3>
-                    <p className="text-4xl font-bold mt-2 text-gray-50">
-                      {totals.engagementRate}%
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Per post average
-                    </p>
-                  </div>
-                )}
-
-                {typeof totals.totalEngagements === "number" &&
-                  totals.totalEngagements > 0 && (
-                    <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                      <h3 className="text-lg font-semibold text-gray-400">
-                        Total Engagements
-                      </h3>
-                      <p className="text-4xl font-bold mt-2 text-gray-50">
-                        {safeToLocale(totals.totalEngagements)}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Likes + Replies + Reposts
-                      </p>
-                    </div>
-                  )}
-
-                {typeof totals.impressions === "number" &&
-                  totals.impressions > 0 && (
-                    <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                      <h3 className="text-lg font-semibold text-gray-400">
-                        Impressions
-                      </h3>
-                      <p className="text-4xl font-bold mt-2 text-gray-50">
-                        {safeToLocale(totals.impressions)}
-                      </p>
-                    </div>
-                  )}
-
-                {typeof totals.postCount === "number" &&
-                  totals.postCount > 0 && (
-                    <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                      <h3 className="text-lg font-semibold text-gray-400">
-                        Posts
-                      </h3>
-                      <p className="text-4xl font-bold mt-2 text-gray-50">
-                        {safeToLocale(totals.postCount)}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        In this period
-                      </p>
-                    </div>
-                  )}
-              </section>
-
-              {/* Charts */}
-              <section className="grid grid-cols-1 gap-6">
-                {/* Mentions Over Time */}
-                <div className="bg-gray-800/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="text-xl font-semibold mb-4 text-gray-200">
-                    Mentions Over Time
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={mentionsSeries}>
-                      <defs>
-                        <linearGradient
-                          id="colorMentions"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#8884d8"
-                            stopOpacity={0.8}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#8884d8"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <XAxis
-                        dataKey="date"
-                        className="text-xs"
-                        stroke="#6b7280"
-                      />
-                      <YAxis className="text-xs" stroke="#6b7280" />
-                      <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                      <Area
-                        type="monotone"
-                        dataKey="mentions"
-                        stroke="#8884d8"
-                        fillOpacity={1}
-                        fill="url(#colorMentions)"
-                      />
-                      <Legend />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Followers Over Time */}
-                {followerSeries.length > 0 && (
-                  <div className="bg-gray-800/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                    <h3 className="text-xl font-semibold mb-4 text-gray-200">
-                      Followers Over Time
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={followerSeries}>
-                        <XAxis
-                          dataKey="date"
-                          className="text-xs"
-                          stroke="#6b7280"
-                        />
-                        <YAxis className="text-xs" stroke="#6b7280" />
-                        <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="followers"
-                          stroke="#82ca9d"
-                          strokeWidth={3}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </section>
-
-              {/* Top Performing Posts */}
-              {topPosts.length > 0 && (
-                <section className="bg-gray-800/80 backdrop-blur rounded-2xl p-6 border border-gray-700/50">
-                  <h3 className="text-xl font-semibold mb-4 text-gray-200">
-                    Top Performing Posts
-                  </h3>
-                  <div className="overflow-auto rounded-xl border border-gray-700">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-900/40">
-                        <tr>
-                          <th className="text-left px-4 py-3 font-semibold text-gray-300">
-                            Post
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Engagement
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Likes
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Replies
-                          </th>
-                          <th className="text-right px-4 py-3 font-semibold text-gray-300">
-                            Reposts
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {topPosts.map((p: any) => (
-                          <tr key={p.id} className="border-t border-gray-700">
-                            <td className="px-4 py-3 max-w-[360px]">
-                              {p.url ? (
-                                <a
-                                  href={p.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-primary hover:text-primary/80 underline"
-                                >
-                                  {p.text?.slice(0, 120) || "View post"}
-                                  {p.text?.length > 120 ? "…" : ""}
-                                </a>
-                              ) : (
-                                <span className="text-gray-200">
-                                  {p.text?.slice(0, 120) || "—"}
-                                  {p.text?.length > 120 ? "…" : ""}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.engagement)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.likes)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.replies)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {safeToLocale(p.reposts)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              )}
             </div>
           )}
         </div>
