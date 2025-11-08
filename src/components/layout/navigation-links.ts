@@ -4,7 +4,6 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
-  Settings,
   TrendingUp,
 } from "lucide-react"
 
@@ -52,11 +51,11 @@ export const mainNavLinks: NavLink[] = [
 ]
 
 export const secondaryNavLinks: NavLink[] = [
-  {
-    href: "/admin/settings",
-    label: "Settings",
-    icon: Settings,
-  },
+  // {
+  //   href: "/admin/settings",
+  //   label: "Settings",
+  //   icon: Settings,
+  // },
   {
     href: "/", // Or a logout endpoint
     label: "Logout",
