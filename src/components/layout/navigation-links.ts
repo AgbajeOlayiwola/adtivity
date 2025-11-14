@@ -1,11 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import {
-  AlertTriangle,
-  FileText,
-  LayoutDashboard,
-  LogOut,
-  TrendingUp,
-} from "lucide-react"
+import { LayoutDashboard, LogOut, TrendingUp, Users, FolderKanban } from "lucide-react"
 
 export interface NavLink {
   href: string
@@ -15,14 +9,30 @@ export interface NavLink {
   isActive?: (pathname: string) => boolean
 }
 
-export const mainNavLinks: NavLink[] = [
+// Top-level navigation (shown when no campaign is selected)
+export const topLevelNavLinks: NavLink[] = [
   {
     href: "/admin/dashboard",
+    label: "Campaigns",
+    icon: FolderKanban,
+    isActive: (pathname) => pathname === "/admin/dashboard",
+  },
+  {
+    href: "/admin/teams",
+    label: "Teams",
+    icon: Users,
+  },
+]
+
+// Campaign-specific navigation (shown when a campaign is selected)
+export const campaignNavLinks: NavLink[] = [
+  {
+    href: "/admin/dashboard/company-info",
     label: "KPI Dashboard",
     icon: LayoutDashboard,
     group: "Overview",
     isActive: (pathname) =>
-      pathname === "/dashboard" || pathname === "/dashboard/kpi",
+      pathname.includes("/company-info") || pathname === "/dashboard/kpi",
   },
   {
     href: "/admin/twitter-analytics",
@@ -30,24 +40,24 @@ export const mainNavLinks: NavLink[] = [
     icon: TrendingUp,
     group: "Analytics",
   },
-  {
-    href: "/admin/anomalies",
-    label: "AI Analysis (Coming Soon)",
-    icon: AlertTriangle,
-    group: "Analytics",
-  },
+  // {
+  //   href: "/admin/anomalies",
+  //   label: "AI Analysis (Coming Soon)",
+  //   icon: AlertTriangle,
+  //   group: "Analytics",
+  // },
   // {
   //   href: "/admin/forecasting",
   //   label: "Predictive Forecasting (Coming Soon)",
   //   icon: TrendingUp,
   //   group: "Analytics",
   // },
-  {
-    href: "/admin/reports",
-    label: "Custom Reports (Coming Soon)",
-    icon: FileText,
-    group: "Reporting",
-  },
+  // {
+  //   href: "/admin/reports",
+  //   label: "Custom Reports (Coming Soon)",
+  //   icon: FileText,
+  //   group: "Reporting",
+  // },
 ]
 
 export const secondaryNavLinks: NavLink[] = [
@@ -63,8 +73,16 @@ export const secondaryNavLinks: NavLink[] = [
   },
 ]
 
+export const groupedCampaignNavLinks = {
+  Overview: campaignNavLinks.filter((link) => link.group === "Overview"),
+  Analytics: campaignNavLinks.filter((link) => link.group === "Analytics"),
+  Reporting: campaignNavLinks.filter((link) => link.group === "Reporting"),
+}
+
+// Keep for backward compatibility
+export const mainNavLinks = topLevelNavLinks
 export const groupedNavLinks = {
-  Overview: mainNavLinks.filter((link) => link.group === "Overview"),
-  Analytics: mainNavLinks.filter((link) => link.group === "Analytics"),
-  Reporting: mainNavLinks.filter((link) => link.group === "Reporting"),
+  Overview: topLevelNavLinks.filter((link) => link.group === "Overview"),
+  Analytics: topLevelNavLinks.filter((link) => link.group === "Analytics"),
+  Reporting: topLevelNavLinks.filter((link) => link.group === "Reporting"),
 }

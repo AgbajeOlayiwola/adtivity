@@ -174,6 +174,12 @@ export const mutationApi = createApi({
         }
       },
     }),
+    deleteClientCompany: builder.mutation({
+      query: ({ companyId }: { companyId: string }) => ({
+        url: `/dashboard/client-companies/${companyId}`,
+        method: "DELETE",
+      }),
+    }),
   }),
 })
 
@@ -190,4 +196,5 @@ export const {
   useChangePasswordMutation,
   useAnalyzeKOLMutation,
   useGetKOLRecommendationMutation,
+  useDeleteClientCompanyMutation,
 } = mutationApi

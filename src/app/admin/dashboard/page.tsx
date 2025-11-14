@@ -25,6 +25,11 @@ import { z } from "zod"
 
 const nameSchema = z.object({
   companyName: z.string({ message: "Invalid name address." }),
+  companyUrl: z
+    .string()
+    .url({ message: "Please enter a valid URL." })
+    .optional()
+    .or(z.literal("")),
 })
 
 type LoginFormValues = z.infer<typeof nameSchema>
@@ -48,6 +53,7 @@ const Dashboard = () => {
     resolver: zodResolver(nameSchema),
     defaultValues: {
       companyName: "",
+      companyUrl: "",
     },
   })
   const [
@@ -64,6 +70,7 @@ const Dashboard = () => {
   function onSubmit(values: LoginFormValues) {
     const data = {
       name: values?.companyName,
+      url: values?.companyUrl || undefined,
     }
     createClientCompany(data)
   }
@@ -128,9 +135,12 @@ const Dashboard = () => {
         </div>
         {modal ? (
           <div className="fixed w-[100vw] h-[100vh] top-0 left-0 bg-[#4b4a4a6c] flex justify-center items-center z-30">
-            <div className="w-[50vw] h-[30vh] bg-[#2a2929] rounded-xl px-5 py-8 z-40">
+            <div className="w-[50vw] min-h-[35vh] bg-[#2a2929] rounded-xl px-5 py-8 z-40">
               <div className="flex justify-end">
-                <MdClose onClick={() => setModal((prev: boolean) => !prev)} />
+                <MdClose
+                  onClick={() => setModal((prev: boolean) => !prev)}
+                  className="cursor-pointer"
+                />
               </div>
               <Form {...form}>
                 <form
@@ -142,11 +152,30 @@ const Dashboard = () => {
                     name="companyName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company Name (create one)</FormLabel>
+                        <FormLabel>Campaign Name</FormLabel>
                         <FormControl>
                           <Input
-                            type="companyName"
-                            placeholder="you@example.com"
+                            type="text"
+                            placeholder="My Campaign"
+                            {...field}
+                            className="bg-background/50 border-border/70 focus:border-primary"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="companyUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Campaign URL</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="url"
+                            placeholder="https://example.com"
                             {...field}
                             className="bg-background/50 border-border/70 focus:border-primary"
                           />

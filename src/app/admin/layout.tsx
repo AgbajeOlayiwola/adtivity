@@ -2,8 +2,9 @@
 
 import AdtivityLogo from "@/components/assets/images/Adtivity_Full_Color_Logo_2.6"
 import {
-  groupedNavLinks,
+  groupedCampaignNavLinks,
   secondaryNavLinks,
+  topLevelNavLinks,
 } from "@/components/layout/navigation-links"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -41,7 +42,7 @@ import { Bell, ChevronDown, Search } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import * as React from "react"
-import { useDispatch } from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 
 export default function DashboardLayout({
   children,
@@ -50,6 +51,10 @@ export default function DashboardLayout({
 }) {
   const dispatch = useDispatch()
   const pathname = usePathname()
+  const { documents }: any = useSelector((store) => store)
+
+  // Determine if we're in campaign view
+  const isInCampaignView = documents?.id && pathname.includes("/company-info")
   const settings = () => {
     window.location.href = "/admin/dashboard"
   }
@@ -101,39 +106,89 @@ export default function DashboardLayout({
             <SidebarTrigger className="hidden md:group-data-[collapsible=icon]:hidden hover:bg-gray-800/50 transition-colors" />
           </SidebarHeader>
           <SidebarContent className="p-3 flex-grow">
-            {Object.entries(groupedNavLinks).map(([groupName, links]) => (
-              <SidebarGroup key={groupName}>
-                <SidebarGroupLabel className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-data-[collapsible=icon]:hidden mb-2 px-2">
-                  {groupName}
-                </SidebarGroupLabel>
-                <SidebarMenu>
-                  {links.map((link) => (
-                    <SidebarMenuItem key={link.href}>
-                      <Link href={link.href} passHref>
-                        <SidebarMenuButton
-                          isActive={
-                            link.isActive
-                              ? link.isActive(pathname)
-                              : pathname.startsWith(link.href)
-                          }
-                          tooltip={{
-                            children: link.label,
-                            className:
-                              "bg-primary text-primary-foreground shadow-lg",
-                          }}
-                          className="text-gray-300 hover:bg-gray-800/60 hover:text-gray-100 transition-all duration-200 data-[active=true]:bg-gradient-to-r data-[active=true]:from-primary/90 data-[active=true]:to-accent/90 data-[active=true]:text-white data-[active=true]:font-semibold data-[active=true]:shadow-lg data-[active=true]:shadow-primary/20 group-data-[collapsible=icon]:justify-center rounded-xl"
-                        >
-                          <link.icon className="h-5 w-5 shrink-0" />
-                          <span className="group-data-[collapsible=icon]:hidden">
-                            {link.label}
-                          </span>
-                        </SidebarMenuButton>
-                      </Link>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroup>
-            ))}
+            {isInCampaignView ? (
+              // Campaign-specific navigation
+              <>
+                <div className="px-2 mb-4">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-gray-300 hover:bg-gray-800/60"
+                    onClick={() => (window.location.href = "/admin/dashboard")}
+                  >
+                    ← Back to Campaigns
+                  </Button>
+                  <div className="mt-2 p-2 rounded-lg bg-gray-800/50">
+                    <p className="text-xs text-gray-400">Current Campaign</p>
+                    <p className="text-sm font-semibold text-white truncate">
+                      {documents?.name || "Unnamed Campaign"}
+                    </p>
+                  </div>
+                </div>
+                {Object.entries(groupedCampaignNavLinks).map(
+                  ([groupName, links]) => (
+                    <SidebarGroup key={groupName}>
+                      <SidebarGroupLabel className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-data-[collapsible=icon]:hidden mb-2 px-2">
+                        {groupName}
+                      </SidebarGroupLabel>
+                      <SidebarMenu>
+                        {links.map((link) => (
+                          <SidebarMenuItem key={link.href}>
+                            <Link href={link.href} passHref>
+                              <SidebarMenuButton
+                                isActive={
+                                  link.isActive
+                                    ? link.isActive(pathname)
+                                    : pathname.startsWith(link.href)
+                                }
+                                tooltip={{
+                                  children: link.label,
+                                  className:
+                                    "bg-primary text-primary-foreground shadow-lg",
+                                }}
+                                className="text-gray-300 hover:bg-gray-800/60 hover:text-gray-100 transition-all duration-200 data-[active=true]:bg-gradient-to-r data-[active=true]:from-primary/90 data-[active=true]:to-accent/90 data-[active=true]:text-white data-[active=true]:font-semibold data-[active=true]:shadow-lg data-[active=true]:shadow-primary/20 group-data-[collapsible=icon]:justify-center rounded-xl"
+                              >
+                                <link.icon className="h-5 w-5 shrink-0" />
+                                <span className="group-data-[collapsible=icon]:hidden">
+                                  {link.label}
+                                </span>
+                              </SidebarMenuButton>
+                            </Link>
+                          </SidebarMenuItem>
+                        ))}
+                      </SidebarMenu>
+                    </SidebarGroup>
+                  )
+                )}
+              </>
+            ) : (
+              // Top-level navigation (Campaigns & Teams)
+              <SidebarMenu>
+                {topLevelNavLinks.map((link) => (
+                  <SidebarMenuItem key={link.href}>
+                    <Link href={link.href} passHref>
+                      <SidebarMenuButton
+                        isActive={
+                          link.isActive
+                            ? link.isActive(pathname)
+                            : pathname.startsWith(link.href)
+                        }
+                        tooltip={{
+                          children: link.label,
+                          className:
+                            "bg-primary text-primary-foreground shadow-lg",
+                        }}
+                        className="text-gray-300 hover:bg-gray-800/60 hover:text-gray-100 transition-all duration-200 data-[active=true]:bg-gradient-to-r data-[active=true]:from-primary/90 data-[active=true]:to-accent/90 data-[active=true]:text-white data-[active=true]:font-semibold data-[active=true]:shadow-lg data-[active=true]:shadow-primary/20 group-data-[collapsible=icon]:justify-center rounded-xl"
+                      >
+                        <link.icon className="h-5 w-5 shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">
+                          {link.label}
+                        </span>
+                      </SidebarMenuButton>
+                    </Link>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            )}
           </SidebarContent>
           <SidebarFooter className="p-3 border-t border-gray-700/30 bg-gray-900/50">
             <SidebarMenu>

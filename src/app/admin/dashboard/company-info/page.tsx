@@ -72,6 +72,7 @@ import RegionalHeatmap from "@/components/compnay-info/heatMap"
 import WalletActivityModal from "@/components/compnay-info/wallet/activity"
 import WalletModal from "@/components/compnay-info/wallet/add-wallet"
 import { Modal } from "@/components/modal"
+import { useDeleteClientCompanyMutation } from "@/redux/api/mutationApi"
 import {
   useCompanyDataQuery,
   useCompanyWeb3EventsQuery,
@@ -81,6 +82,7 @@ import {
   useNewUsersAnalyticsQuery,
   useUserEngagementTimeSeriesQuery,
 } from "@/redux/api/queryApi"
+import { useRouter } from "next/navigation"
 
 // Reusable AI analytics launcher
 
@@ -214,16 +216,21 @@ const networkBadgeColor: Record<string, string> = {
 }
 
 export default function KpiDashboardPage() {
+  const router = useRouter()
   const [rawEvents, setRawEvents] = useState<any[]>([])
   const [analyticsData, setAnalyticsData] = useState({
     uniqueSessions: 0,
     uniqueButtonNames: [] as string[],
+    uniqueLinkNames: [] as string[],
     uniquePagePaths: [] as string[],
     uniquePageEventNames: [] as string[],
   })
+  const [clickType, setClickType] = useState<"buttons" | "links">("buttons") // Default to buttons
   const [selectedButton, setSelectedButton] = useState("All Clicks")
+  const [selectedLink, setSelectedLink] = useState("All Links")
   const [selectedPage, setSelectedPage] = useState("All Pages")
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showDeleteCampaignModal, setShowDeleteCampaignModal] = useState(false)
   const [showWeb3Modal, setShowWeb3odal] = useState(false)
   const [showRegenerateModal, setShowRegenerateModal] = useState(false)
   const [isWeb3Added, setIsWeb3Added] = useState(false)
@@ -234,6 +241,8 @@ export default function KpiDashboardPage() {
   const [selectedCountry, setSelectedCountry] = useState("World View")
 
   const { documents, apikey }: any = useSelector((store) => store)
+
+  const [deleteClientCompany, { isLoading: isDeleting }] = useDeleteClientCompanyMutation()
 
   const {
     data: web2Events,
@@ -454,6 +463,16 @@ export default function KpiDashboardPage() {
       ...new Set(heroClicks.map((event: any) => event.event_name)),
     ]
 
+    const linkClicks = events.filter(
+      (event: any) =>
+        event.event_name.startsWith("Link:") ||
+        event.event_name === "Link Clicked"
+    )
+    const uniqueLinkNames = [
+      "All Links",
+      ...new Set(linkClicks.map((event: any) => event.event_name)),
+    ]
+
     const pageEvents = events.filter(
       (event: any) =>
         event.event_name === "Page Viewed" || event.event_name === "Page Loaded"
@@ -477,8 +496,10 @@ export default function KpiDashboardPage() {
 
     return {
       heroClicks,
+      linkClicks,
       uniqueSessions: sessions.size,
       uniqueButtonNames,
+      uniqueLinkNames,
       uniquePagePaths,
       uniquePageEventNames,
     }
@@ -487,16 +508,27 @@ export default function KpiDashboardPage() {
   const totalHeroClicks = useMemo(() => {
     if (!rawEvents.length) return 0
     const filteredClicks = rawEvents.filter((event: any) => {
-      if (selectedButton === "All Clicks") {
-        return (
-          event.event_name.startsWith("Button:") ||
-          event.event_name.startsWith("Hero:")
-        )
+      if (clickType === "buttons") {
+        if (selectedButton === "All Clicks") {
+          return (
+            event.event_name.startsWith("Button:") ||
+            event.event_name.startsWith("Hero:")
+          )
+        }
+        return event.event_name === selectedButton
+      } else {
+        // links
+        if (selectedLink === "All Links") {
+          return (
+            event.event_name.startsWith("Link:") ||
+            event.event_name === "Link Clicked"
+          )
+        }
+        return event.event_name === selectedLink
       }
-      return event.event_name === selectedButton
     })
     return filteredClicks.length
-  }, [rawEvents, selectedButton])
+  }, [rawEvents, clickType, selectedButton, selectedLink])
 
   const totalPageViews = useMemo(() => {
     if (!rawEvents.length) return 0
@@ -536,13 +568,24 @@ export default function KpiDashboardPage() {
   const clicksChartData = useMemo(() => {
     if (!rawEvents.length) return [] as any[]
     const dailyClicks = rawEvents
-      .filter(
-        (event: any) =>
-          (selectedButton === "All Clicks" &&
-            (event.event_name.startsWith("Button:") ||
-              event.event_name.startsWith("Hero:"))) ||
-          event.event_name === selectedButton
-      )
+      .filter((event: any) => {
+        if (clickType === "buttons") {
+          return (
+            (selectedButton === "All Clicks" &&
+              (event.event_name.startsWith("Button:") ||
+                event.event_name.startsWith("Hero:"))) ||
+            event.event_name === selectedButton
+          )
+        } else {
+          // links
+          return (
+            (selectedLink === "All Links" &&
+              (event.event_name.startsWith("Link:") ||
+                event.event_name === "Link Clicked")) ||
+            event.event_name === selectedLink
+          )
+        }
+      })
       .reduce((acc: any, event: any) => {
         const date = new Date(event.timestamp).toLocaleDateString("en-US", {
           month: "2-digit",
@@ -555,7 +598,7 @@ export default function KpiDashboardPage() {
       date,
       clicks,
     }))
-  }, [rawEvents, selectedButton])
+  }, [rawEvents, clickType, selectedButton, selectedLink])
 
   const web3Kpis = useMemo(() => {
     if (!Array.isArray(web3Events) || web3Events.length === 0) {
@@ -654,6 +697,19 @@ export default function KpiDashboardPage() {
     setShowRegenerateModal(false)
   }
 
+  const handleDeleteCampaign = async () => {
+    try {
+      await deleteClientCompany({ companyId: documents?.id }).unwrap()
+      setShowDeleteCampaignModal(false)
+      // Navigate back to dashboard
+      router.push("/admin/dashboard")
+    } catch (error) {
+      console.error("Failed to delete campaign:", error)
+      // Keep modal open to show error
+      alert("Failed to delete campaign. Please try again.")
+    }
+  }
+
   // -------------------------------------------
   // Wallets grid + modal state
   // -------------------------------------------
@@ -704,6 +760,14 @@ export default function KpiDashboardPage() {
         onConfirm={handleRegenerateApiKey}
         onCancel={() => setShowRegenerateModal(false)}
         confirmText="Regenerate"
+      />
+      <Modal
+        isOpen={showDeleteCampaignModal}
+        title="Delete Campaign"
+        message="Are you sure you want to delete this campaign? This action cannot be undone and will remove all associated data."
+        onConfirm={handleDeleteCampaign}
+        onCancel={() => setShowDeleteCampaignModal(false)}
+        confirmText={isDeleting ? "Deleting..." : "Yes, Delete"}
       />
 
       <div>
@@ -776,6 +840,15 @@ export default function KpiDashboardPage() {
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete All Events
+              </Button>
+              <Button
+                variant="destructive"
+                className="cursor-target bg-red-600 hover:bg-red-700"
+                onClick={() => setShowDeleteCampaignModal(true)}
+                disabled={isDeleting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {isDeleting ? "Deleting..." : "Delete Campaign"}
               </Button>
             </div>
           </div>
@@ -1579,7 +1652,7 @@ export default function KpiDashboardPage() {
           <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Total Hero Clicks
+                Total {clickType === "buttons" ? "Button" : "Link"} Clicks
               </CardTitle>
               <Target className="h-4 w-4 text-purple-500" />
             </CardHeader>
@@ -1588,24 +1661,62 @@ export default function KpiDashboardPage() {
                 {totalHeroClicks.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Clicks on the hero section
+                {clickType === "buttons" ? "Button clicks" : "Link clicks"}
               </p>
 
-              <StickySelect
-                value={selectedButton}
-                onValueChange={setSelectedButton}
-                placeholder="Select a button"
-              >
-                {analyticsData.uniqueButtonNames.map((buttonName: string) => (
-                  <SelectItem
-                    key={buttonName}
-                    className="cursor-target"
-                    value={buttonName}
-                  >
-                    {buttonName}
-                  </SelectItem>
-                ))}
-              </StickySelect>
+              {/* Click Type Selector */}
+              <div className="flex gap-2 mb-3 mt-3">
+                <Button
+                  size="sm"
+                  variant={clickType === "buttons" ? "default" : "outline"}
+                  onClick={() => setClickType("buttons")}
+                  className="cursor-target flex-1"
+                >
+                  Buttons
+                </Button>
+                <Button
+                  size="sm"
+                  variant={clickType === "links" ? "default" : "outline"}
+                  onClick={() => setClickType("links")}
+                  className="cursor-target flex-1"
+                >
+                  Links
+                </Button>
+              </div>
+
+              {clickType === "buttons" ? (
+                <StickySelect
+                  value={selectedButton}
+                  onValueChange={setSelectedButton}
+                  placeholder="Select a button"
+                >
+                  {analyticsData.uniqueButtonNames.map((buttonName: string) => (
+                    <SelectItem
+                      key={buttonName}
+                      className="cursor-target"
+                      value={buttonName}
+                    >
+                      {buttonName}
+                    </SelectItem>
+                  ))}
+                </StickySelect>
+              ) : (
+                <StickySelect
+                  value={selectedLink}
+                  onValueChange={setSelectedLink}
+                  placeholder="Select a link"
+                >
+                  {analyticsData.uniqueLinkNames.map((linkName: string) => (
+                    <SelectItem
+                      key={linkName}
+                      className="cursor-target"
+                      value={linkName}
+                    >
+                      {linkName}
+                    </SelectItem>
+                  ))}
+                </StickySelect>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -1721,9 +1832,186 @@ export default function KpiDashboardPage() {
       />
 
       {/* -------------------------------------------------- */}
-      {/* Regional + Charts                                    */}
+      {/* Charts + Regional                                    */}
       {/* -------------------------------------------------- */}
       <div className="grid gap-6 md:grid-cols-2">
+        {/* ----------- Chart: Page Views ----------- */}
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
+          <CardHeader className="flex flex-row items-start justify-between space-x-2">
+            <div>
+              <CardTitle className="font-headline flex items-center">
+                <Eye className="mr-2 h-5 w-5 text-accent" /> Daily Page Views
+              </CardTitle>
+              <CardDescription>
+                Page views over the last 7 days.
+              </CardDescription>
+            </div>
+            <StickySelect
+              value={selectedPage}
+              onValueChange={setSelectedPage}
+              placeholder="Select a page"
+            >
+              {analyticsData.uniquePagePaths.map((path: any) => (
+                <SelectItem key={path} className="cursor-target" value={path}>
+                  {path}
+                </SelectItem>
+              ))}
+            </StickySelect>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 rounded-xl bg-white">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">
+                  {String(startDate) || "All time"} → {String(endDate) || "Now"}
+                </span>
+                <span className="text-xs font-medium">{selectedPage}</span>
+              </div>
+              <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                <LineChart data={pageViewsChartData} accessibilityLayer>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border)/0.5)"
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    stroke="hsl(var(--muted-foreground))"
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                    }}
+                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="views"
+                    stroke="var(--color-views)"
+                    strokeWidth={3}
+                    dot={{
+                      r: 5,
+                      fill: "var(--color-views)",
+                      strokeWidth: 2,
+                      stroke: "hsl(var(--background))",
+                    }}
+                    activeDot={{ r: 7 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+              <div className="mt-2 text-[10px] text-gray-400">
+                Generated by Adtivity — Page Views
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ----------- Chart: Clicks (Buttons/Links) ----------- */}
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
+          <CardHeader className="flex flex-row items-start justify-between space-x-2">
+            <div>
+              <CardTitle className="font-headline flex items-center">
+                <Target className="mr-2 h-5 w-5 text-purple-500" /> Daily {clickType === "buttons" ? "Button" : "Link"} Clicks
+              </CardTitle>
+              <CardDescription>
+                {clickType === "buttons" ? "Buttons" : "Links"} clicked over the last 7 days.
+              </CardDescription>
+            </div>
+            {clickType === "buttons" ? (
+              <StickySelect
+                value={selectedButton}
+                onValueChange={setSelectedButton}
+                placeholder="Select a button"
+              >
+                {analyticsData.uniqueButtonNames.map((buttonName: string) => (
+                  <SelectItem
+                    key={buttonName}
+                    className="cursor-target"
+                    value={buttonName}
+                  >
+                    {buttonName}
+                  </SelectItem>
+                ))}
+              </StickySelect>
+            ) : (
+              <StickySelect
+                value={selectedLink}
+                onValueChange={setSelectedLink}
+                placeholder="Select a link"
+              >
+                {analyticsData.uniqueLinkNames.map((linkName: string) => (
+                  <SelectItem
+                    key={linkName}
+                    className="cursor-target"
+                    value={linkName}
+                  >
+                    {linkName}
+                  </SelectItem>
+                ))}
+              </StickySelect>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 rounded-xl bg-white">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">
+                  {String(startDate) || "All time"} → {String(endDate) || "Now"}
+                </span>
+                <span className="text-xs font-medium">
+                  {clickType === "buttons" ? selectedButton : selectedLink}
+                </span>
+              </div>
+              <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                <LineChart data={clicksChartData} accessibilityLayer>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border)/0.5)"
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    stroke="hsl(var(--muted-foreground))"
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                    }}
+                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="clicks"
+                    stroke="purple"
+                    strokeWidth={6}
+                    dot={{
+                      r: 5,
+                      fill: "purple",
+                      strokeWidth: 2,
+                      stroke: "red",
+                    }}
+                    activeDot={{ r: 7 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+              <div className="mt-2 text-[10px] text-gray-400">
+                Generated by Adtivity — {clickType === "buttons" ? "Button" : "Link"} Clicks
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ----------- Regional Data Map ----------- */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center">
@@ -1856,163 +2144,6 @@ export default function KpiDashboardPage() {
                   selectedCountry={selectedCountry}
                 />
               )}
-          </CardContent>
-        </Card>
-
-        {/* ----------- Chart: Page Views ----------- */}
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
-          <CardHeader className="flex flex-row items-start justify-between space-x-2">
-            <div>
-              <CardTitle className="font-headline flex items-center">
-                <Eye className="mr-2 h-5 w-5 text-accent" /> Daily Page Views
-              </CardTitle>
-              <CardDescription>
-                Page views over the last 7 days.
-              </CardDescription>
-            </div>
-            <StickySelect
-              value={selectedPage}
-              onValueChange={setSelectedPage}
-              placeholder="Select a page"
-            >
-              {analyticsData.uniquePagePaths.map((path: any) => (
-                <SelectItem key={path} className="cursor-target" value={path}>
-                  {path}
-                </SelectItem>
-              ))}
-            </StickySelect>
-          </CardHeader>
-          <CardContent>
-            <div className="p-4 rounded-xl bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-500">
-                  {String(startDate) || "All time"} → {String(endDate) || "Now"}
-                </span>
-                <span className="text-xs font-medium">{selectedPage}</span>
-              </div>
-              <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <LineChart data={pageViewsChartData} accessibilityLayer>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--border)/0.5)"
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={10}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)",
-                    }}
-                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
-                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="views"
-                    stroke="var(--color-views)"
-                    strokeWidth={3}
-                    dot={{
-                      r: 5,
-                      fill: "var(--color-views)",
-                      strokeWidth: 2,
-                      stroke: "hsl(var(--background))",
-                    }}
-                    activeDot={{ r: 7 }}
-                  />
-                </LineChart>
-              </ChartContainer>
-              <div className="mt-2 text-[10px] text-gray-400">
-                Generated by Adtivity — Page Views
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ----------- Chart: Clicks ----------- */}
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
-          <CardHeader className="flex flex-row items-start justify-between space-x-2">
-            <div>
-              <CardTitle className="font-headline flex items-center">
-                <Target className="mr-2 h-5 w-5 text-purple-500" /> Daily Button
-                Clicks
-              </CardTitle>
-              <CardDescription>
-                Buttons clicked over the last 7 days.
-              </CardDescription>
-            </div>
-            <StickySelect
-              value={selectedButton}
-              onValueChange={setSelectedButton}
-              placeholder="Select a button"
-            >
-              {analyticsData.uniqueButtonNames.map((buttonName: string) => (
-                <SelectItem
-                  key={buttonName}
-                  className="cursor-target"
-                  value={buttonName}
-                >
-                  {buttonName}
-                </SelectItem>
-              ))}
-            </StickySelect>
-          </CardHeader>
-          <CardContent>
-            <div className="p-4 rounded-xl bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-500">
-                  {String(startDate) || "All time"} → {String(endDate) || "Now"}
-                </span>
-                <span className="text-xs font-medium">{selectedButton}</span>
-              </div>
-              <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <LineChart data={clicksChartData} accessibilityLayer>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--border)/0.5)"
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={10}
-                    stroke="hsl(var(--muted-foreground))"
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)",
-                    }}
-                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
-                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="clicks"
-                    stroke="purple"
-                    strokeWidth={6}
-                    dot={{
-                      r: 5,
-                      fill: "purple",
-                      strokeWidth: 2,
-                      stroke: "red",
-                    }}
-                    activeDot={{ r: 7 }}
-                  />
-                </LineChart>
-              </ChartContainer>
-              <div className="mt-2 text-[10px] text-gray-400">
-                Generated by Adtivity — Button Clicks
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
