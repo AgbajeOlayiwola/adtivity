@@ -1834,9 +1834,11 @@ export default function KpiDashboardPage() {
       {/* -------------------------------------------------- */}
       {/* Charts + Regional                                    */}
       {/* -------------------------------------------------- */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="space-y-6">
+        {/* Charts Row */}
+        <div className="grid gap-6 md:grid-cols-2">
         {/* ----------- Chart: Page Views ----------- */}
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
+        <Card key="page-views-chart" className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader className="flex flex-row items-start justify-between space-x-2">
             <div>
               <CardTitle className="font-headline flex items-center">
@@ -1867,7 +1869,7 @@ export default function KpiDashboardPage() {
                 <span className="text-xs font-medium">{selectedPage}</span>
               </div>
               <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <LineChart data={pageViewsChartData} accessibilityLayer>
+                <LineChart key="page-views-line-chart" data={pageViewsChartData} accessibilityLayer>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="hsl(var(--border)/0.5)"
@@ -1912,7 +1914,7 @@ export default function KpiDashboardPage() {
         </Card>
 
         {/* ----------- Chart: Clicks (Buttons/Links) ----------- */}
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
+        <Card key="clicks-chart" className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader className="flex flex-row items-start justify-between space-x-2">
             <div>
               <CardTitle className="font-headline flex items-center">
@@ -1967,7 +1969,7 @@ export default function KpiDashboardPage() {
                 </span>
               </div>
               <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <LineChart data={clicksChartData} accessibilityLayer>
+                <LineChart key="clicks-line-chart" data={clicksChartData} accessibilityLayer>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="hsl(var(--border)/0.5)"
@@ -2010,9 +2012,11 @@ export default function KpiDashboardPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
 
-        {/* ----------- Regional Data Map ----------- */}
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg col-span-2">
+        {/* Regional Map Row */}
+        <div className="w-full">
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center">
               <CardTitle className="font-headline flex items-center">
@@ -2146,6 +2150,7 @@ export default function KpiDashboardPage() {
               )}
           </CardContent>
         </Card>
+        </div>
       </div>
 
       {/* Shareable Growth Image component (receives both web2 + web3 data) */}

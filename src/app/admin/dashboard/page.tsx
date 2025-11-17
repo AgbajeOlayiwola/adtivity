@@ -70,7 +70,7 @@ const Dashboard = () => {
   function onSubmit(values: LoginFormValues) {
     const data = {
       name: values?.companyName,
-      url: values?.companyUrl || undefined,
+      campaign_url: values?.companyUrl || undefined,
     }
     createClientCompany(data)
   }

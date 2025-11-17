@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react"
-import { LayoutDashboard, LogOut, TrendingUp, Users, FolderKanban } from "lucide-react"
+import { LayoutDashboard, LogOut, TrendingUp, Users, FolderKanban, BookOpen } from "lucide-react"
 
 export interface NavLink {
   href: string
@@ -61,6 +61,11 @@ export const campaignNavLinks: NavLink[] = [
 ]
 
 export const secondaryNavLinks: NavLink[] = [
+  {
+    href: "/admin/docs",
+    label: "Documentation",
+    icon: BookOpen,
+  },
   // {
   //   href: "/admin/settings",
   //   label: "Settings",

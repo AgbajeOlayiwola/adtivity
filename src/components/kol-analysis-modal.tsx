@@ -8,7 +8,8 @@ import {
 } from "@/redux/api/queryApi"
 import { useAnalyzeKOLMutation, useGetKOLRecommendationMutation } from "@/redux/api/mutationApi"
 import { AlertCircle, X, Sparkles } from "lucide-react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
+import { filterRetweetsFromAnalytics } from "@/lib/utils"
 
 // ---------------------- helpers ----------------------
 const safeToLocale = (n?: number) =>
@@ -30,7 +31,7 @@ export default function KOLAnalysisModal({
 
   // KOL Analysis state
   const [maxTweets, setMaxTweets] = useState(10)
-  const [maxMentions, setMaxMentions] = useState(100)
+  const [maxMentions, setMaxMentions] = useState(20)
   const [kolAnalysisData, setKolAnalysisData] = useState<any>(null)
 
   // AI Recommendation state
@@ -107,8 +108,10 @@ export default function KOLAnalysisModal({
     }
 
     try {
+      // Use filtered data for AI recommendation
+      const dataToSend = filterRetweetsFromAnalytics(kolAnalysisData)
       const response = await getKOLRecommendation({
-        kol_data: kolAnalysisData,
+        kol_data: dataToSend,
         brand_goals: selectedGoals,
         additional_context: additionalContext || undefined,
       }).unwrap()
@@ -169,6 +172,12 @@ export default function KOLAnalysisModal({
     // Call the parent onClose
     onClose()
   }
+
+  // Filter out retweets from KOL analysis data
+  const filteredKolAnalysisData = useMemo(() => {
+    if (!kolAnalysisData) return null
+    return filterRetweetsFromAnalytics(kolAnalysisData)
+  }, [kolAnalysisData])
 
   if (!open) return null
 
@@ -318,13 +327,13 @@ export default function KOLAnalysisModal({
                 <div className="space-y-2">
                   <label className="text-sm text-gray-300 flex items-center gap-2">
                     <span>Number of Mentions to Analyze</span>
-                    <span className="text-xs text-gray-500">(default: 100)</span>
+                    <span className="text-xs text-gray-500">(max: 20)</span>
                   </label>
                   <div className="flex items-center gap-4">
                     <input
                       type="range"
                       min="10"
-                      max="200"
+                      max="20"
                       step="10"
                       value={maxMentions}
                       onChange={(e) => setMaxMentions(Number(e.target.value))}
@@ -385,7 +394,7 @@ export default function KOLAnalysisModal({
         {/* Analytics Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-200px)] p-6">
           {/* KOL Analysis Results */}
-          {kolAnalysisData && (
+          {filteredKolAnalysisData && (
             <div className="mb-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -402,47 +411,47 @@ export default function KOLAnalysisModal({
               </div>
 
               {/* Profile Information */}
-              {kolAnalysisData.profile && (
+              {filteredKolAnalysisData.profile && (
                 <Card className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 border-gray-700/50">
                   <div className="p-6">
                     <div className="flex items-start gap-4">
-                      {kolAnalysisData.profile.profile_image_url && (
+                      {filteredKolAnalysisData.profile.profile_image_url && (
                         <img
-                          src={kolAnalysisData.profile.profile_image_url}
-                          alt={kolAnalysisData.profile.name}
+                          src={filteredKolAnalysisData.profile.profile_image_url}
+                          alt={filteredKolAnalysisData.profile.name}
                           className="w-16 h-16 rounded-full border-2 border-primary"
                         />
                       )}
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <h3 className="text-xl font-bold text-white">
-                            {kolAnalysisData.profile.name}
+                            {filteredKolAnalysisData.profile.name}
                           </h3>
-                          {kolAnalysisData.profile.verified && (
+                          {filteredKolAnalysisData.profile.verified && (
                             <span className="text-blue-500">✓</span>
                           )}
                         </div>
-                        <p className="text-gray-400">@{kolAnalysisData.profile.username}</p>
-                        {kolAnalysisData.profile.description && (
-                          <p className="text-gray-300 mt-2">{kolAnalysisData.profile.description}</p>
+                        <p className="text-gray-400">@{filteredKolAnalysisData.profile.username}</p>
+                        {filteredKolAnalysisData.profile.description && (
+                          <p className="text-gray-300 mt-2">{filteredKolAnalysisData.profile.description}</p>
                         )}
                         <div className="flex gap-6 mt-3 text-sm">
                           <div>
                             <span className="text-gray-400">Followers:</span>
                             <span className="text-white font-semibold ml-1">
-                              {safeToLocale(kolAnalysisData.profile.followers_count)}
+                              {safeToLocale(filteredKolAnalysisData.profile.followers_count)}
                             </span>
                           </div>
                           <div>
                             <span className="text-gray-400">Following:</span>
                             <span className="text-white font-semibold ml-1">
-                              {safeToLocale(kolAnalysisData.profile.following_count)}
+                              {safeToLocale(filteredKolAnalysisData.profile.following_count)}
                             </span>
                           </div>
                           <div>
                             <span className="text-gray-400">Tweets:</span>
                             <span className="text-white font-semibold ml-1">
-                              {safeToLocale(kolAnalysisData.profile.tweets_count)}
+                              {safeToLocale(filteredKolAnalysisData.profile.tweets_count)}
                             </span>
                           </div>
                         </div>
@@ -453,14 +462,14 @@ export default function KOLAnalysisModal({
               )}
 
               {/* Analysis Summary */}
-              {kolAnalysisData.analysis_summary && Object.keys(kolAnalysisData.analysis_summary).length > 0 && (
+              {filteredKolAnalysisData.analysis_summary && Object.keys(filteredKolAnalysisData.analysis_summary).length > 0 && (
                 <Card className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border-blue-700/30">
                   <div className="p-6">
                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                      <span>📊</span> Analysis Summary
+                      <span>📊</span> Analysis Summary (Retweets Excluded)
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {Object.entries(kolAnalysisData.analysis_summary)
+                      {Object.entries(filteredKolAnalysisData.analysis_summary)
                         .filter(([key]) => !['top_performing_tweets', 'top_hashtags', 'errors'].includes(key))
                         .map(([key, value]) => (
                           <div key={key} className="bg-gray-800/50 rounded-lg p-4">
@@ -481,22 +490,22 @@ export default function KOLAnalysisModal({
 
               {/* Tweets & Mentions Count */}
               <div className="grid grid-cols-2 gap-4">
-                {kolAnalysisData.user_tweets && (
+                {filteredKolAnalysisData.user_tweets && (
                   <Card className="bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border-emerald-700/30">
                     <div className="p-6">
-                      <h3 className="text-sm text-gray-400">Analyzed Tweets</h3>
+                      <h3 className="text-sm text-gray-400">Analyzed Tweets (Original Only)</h3>
                       <p className="text-3xl font-bold text-white mt-2">
-                        {Array.isArray(kolAnalysisData.user_tweets) ? kolAnalysisData.user_tweets.length : 0}
+                        {Array.isArray(filteredKolAnalysisData.user_tweets) ? filteredKolAnalysisData.user_tweets.length : 0}
                       </p>
                     </div>
                   </Card>
                 )}
-                {kolAnalysisData.mentions && (
+                {filteredKolAnalysisData.mentions && (
                   <Card className="bg-gradient-to-br from-orange-900/20 to-red-900/20 border-orange-700/30">
                     <div className="p-6">
                       <h3 className="text-sm text-gray-400">Analyzed Mentions</h3>
                       <p className="text-3xl font-bold text-white mt-2">
-                        {Array.isArray(kolAnalysisData.mentions) ? kolAnalysisData.mentions.length : 0}
+                        {Array.isArray(filteredKolAnalysisData.mentions) ? filteredKolAnalysisData.mentions.length : 0}
                       </p>
                     </div>
                   </Card>
@@ -504,16 +513,16 @@ export default function KOLAnalysisModal({
               </div>
 
               {/* Top Performing Tweets */}
-              {kolAnalysisData.analysis_summary?.top_performing_tweets &&
-                Array.isArray(kolAnalysisData.analysis_summary.top_performing_tweets) &&
-                kolAnalysisData.analysis_summary.top_performing_tweets.length > 0 && (
+              {filteredKolAnalysisData.analysis_summary?.top_performing_tweets &&
+                Array.isArray(filteredKolAnalysisData.analysis_summary.top_performing_tweets) &&
+                filteredKolAnalysisData.analysis_summary.top_performing_tweets.length > 0 && (
                 <Card className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border-purple-700/30">
                   <div className="p-6">
                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                      <span>🔥</span> Top Performing Tweets
+                      <span>🔥</span> Top Performing Tweets (Original Content)
                     </h3>
                     <div className="space-y-3">
-                      {kolAnalysisData.analysis_summary.top_performing_tweets.map((tweet: any, index: number) => (
+                      {filteredKolAnalysisData.analysis_summary.top_performing_tweets.map((tweet: any, index: number) => (
                         <div key={tweet.tweet_id || index} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
                           <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
@@ -541,12 +550,12 @@ export default function KOLAnalysisModal({
               )}
 
               {/* Error Display */}
-              {kolAnalysisData.error && (
+              {filteredKolAnalysisData.error && (
                 <div className="flex items-center gap-2 text-amber-400 text-sm bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
                   <AlertCircle className="h-5 w-5 flex-shrink-0" />
                   <div>
                     <p className="font-semibold">Note:</p>
-                    <p>{kolAnalysisData.error}</p>
+                    <p>{filteredKolAnalysisData.error}</p>
                   </div>
                 </div>
               )}

@@ -54,7 +54,14 @@ export default function DashboardLayout({
   const { documents }: any = useSelector((store) => store)
 
   // Determine if we're in campaign view
-  const isInCampaignView = documents?.id && pathname.includes("/company-info")
+  const isInCampaignView = documents?.id && (
+    pathname.includes("/company-info") ||
+    pathname.includes("/twitter-analytics") ||
+    pathname.includes("/ai-analytics") ||
+    pathname.includes("/admin/reports") ||
+    pathname.includes("/admin/anomalies") ||
+    pathname.includes("/admin/forecasting")
+  )
   const settings = () => {
     window.location.href = "/admin/dashboard"
   }
